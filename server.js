@@ -485,6 +485,23 @@ room.statusText = seat.name + ' nusimetė 3 kortas ir renkasi galutinį šaukim�
 }
 broadcastState(roomCode);
 });
+    socket.on('undiscardCard', ({ roomCode, discardIndex }) => {
+        const room = rooms[roomCode];
+        if (!room || (room.phase !== 'DISCARD_3' && room.phase !== 'RAISE_BID')) return;
+        const seatIdx = room.seats.findIndex(s => s.socketId === socket.id);
+        if (seatIdx !== room.highestBidderIndex) return;
+
+        const seat = room.seats[seatIdx];
+        const card = room.discardedPile.splice(discardIndex, 1).at(0);
+        if (!card) return;
+
+        seat.hand.push(card);
+        seat.roundScore -= card.value;
+        room.phase = 'DISCARD_3';
+        room.statusText = seat.name + ' susigrąžino kortą. Liko nusimesti: ' + (3 - room.discardedPile.length) + '.';
+        broadcastState(roomCode);
+    });
+
 socket.on('adjustBidAfterTalon', ({ roomCode, delta }) => {
 const room = rooms[roomCode];
 if (!room || room.phase !== 'RAISE_BID') return;

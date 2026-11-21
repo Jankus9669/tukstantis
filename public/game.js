@@ -370,23 +370,36 @@ function renderDiscarded(state) {
     }
 
     const bidderName = state.seats.at(state.highestBidderIndex).name;
-if (state.discardedPile.length > 0) {
-info.innerText = 'Tavo nusimestos (+' + state.discardedPoints + ' tšk.):';
-state.discardedPile.forEach(c => {
-const div = document.createElement('div');
-div.className = 'card small ' + (c.isRed ? 'red' : '');
-div.innerHTML = '' + c.name + '' + c.suit + '';
-container.appendChild(div);
-});
-} else {
-info.innerText = bidderName + ' nusimetė (+' + state.discardedPoints + ' tšk.)';
-for (let i = 0; i < state.discardedCount; i++) {
-const div = document.createElement('div');
-div.className = 'card small hidden';
-container.appendChild(div);
+    const canUndo = (state.highestBidderIndex === state.mySeatIndex) && (state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID');
+
+    if (state.discardedPile.length > 0) {
+        info.innerText = canUndo
+            ? 'Tavo nusimestos (+' + state.discardedPoints + ' tšk.) – paspausk, jei nori susigrąžinti:'
+            : 'Tavo nusimestos (+' + state.discardedPoints + ' tšk.):';
+
+        state.discardedPile.forEach((c, idx) => {
+            const div = document.createElement('div');
+            div.className = 'card small ' + (c.isRed ? 'red' : '') + (canUndo ? ' clickable' : '');
+            div.innerHTML = '<div>' + c.name + '</div><div>' + c.suit + '</div>';
+            if (canUndo) {
+                div.title = 'Paspausk, kad sugrąžintum į ranką';
+                div.addEventListener('click', () => {
+                    playSound('card');
+                    socket.emit('undiscardCard', { roomCode: currentRoomCode, discardIndex: idx });
+                });
+            }
+            container.appendChild(div);
+        });
+    } else {
+        info.innerText = bidderName + ' nusimetė (+' + state.discardedPoints + ' tšk.)';
+        for (let i = 0; i < state.discardedCount; i++) {
+            const div = document.createElement('div');
+            div.className = 'card small hidden';
+            container.appendChild(div);
+        }
+    }
 }
-}
-}
+
 // Susirašinėjimo (Chat) valdymas
 function sendChatMessage(textToSend) {
 if (!currentRoomCode) return;

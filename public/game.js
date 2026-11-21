@@ -1,6 +1,5 @@
 const socket = io();
 
-// Sugeneruojame arba nuskaitome nuolatinį žaidėjo raktą telefone
 let playerToken = localStorage.getItem('tukstantis_token');
 if (!playerToken) {
     playerToken = 'plr_' + Math.random().toString(36).substring(2, 12) + Date.now();
@@ -12,7 +11,6 @@ let currentRoomCode = sessionStorage.getItem('tukstantis_room') || null;
 let lastState = null;
 let soundEnabled = true;
 
-// Kai tik atsidaro puslapis arba grįžtama iš Messenger, prisijungiame atgal į kambarį
 socket.on('connect', () => {
     if (currentRoomCode) {
         socket.emit('rejoinRoom', { roomCode: currentRoomCode, playerToken: playerToken });
@@ -26,8 +24,6 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 
-
-// --- GARSO GENERATORIUS (Web Audio API) ---
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
@@ -43,7 +39,6 @@ function playSound(type) {
         const now = audioCtx.currentTime;
 
         if (type === 'card') {
-            // Kortos šlamesio garsas
             const bufferSize = audioCtx.sampleRate * 0.08;
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
             const data = buffer.getChannelData(0);
@@ -66,7 +61,6 @@ function playSound(type) {
             gain.connect(audioCtx.destination);
             noise.start(now);
         } else if (type === 'bid') {
-            // Statymo garsas
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = 'sine';
@@ -79,7 +73,6 @@ function playSound(type) {
             osc.start(now);
             osc.stop(now + 0.07);
         } else if (type === 'marriage') {
-            // Karališkas poros paskelbimo akordas
             [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
@@ -93,7 +86,6 @@ function playSound(type) {
                 osc.stop(now + idx * 0.06 + 0.45);
             });
         } else if (type === 'chat') {
-            // Žinutės pyptelėjimas
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = 'sine';
@@ -105,7 +97,6 @@ function playSound(type) {
             osc.start(now);
             osc.stop(now + 0.12);
         } else if (type === 'win') {
-            // Pergalės garsas
             [440, 554.37, 659.25, 880].forEach((freq, idx) => {
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
@@ -122,7 +113,6 @@ function playSound(type) {
     } catch (e) {}
 }
 
-// Sukuriame kompaktišką garso mygtuką kambario kodo juostoje
 const soundBtn = document.createElement('button');
 soundBtn.innerText = '🔊';
 soundBtn.title = 'Įjungti / išjungti garsą';
@@ -136,7 +126,6 @@ const roomBannerEl = document.querySelector('.room-banner');
 if (roomBannerEl) {
     roomBannerEl.appendChild(soundBtn);
 }
-
 
 document.getElementById('lobbyMale').addEventListener('click', () => {
     initAudio();
@@ -169,11 +158,7 @@ document.getElementById('joinRoomBtn').addEventListener('click', () => {
     socket.emit('joinRoom', { roomCode: code, playerName: name, avatar: selectedAvatar, playerToken: playerToken });
 });
 
-     socket.emit('joinRoom', { roomCode: code, playerName: name, avatar: selectedAvatar, playerToken: playerToken });
-});
-
 socket.on('errorMsg', (msg) => {
-
     alert(msg);
 });
 
@@ -190,7 +175,6 @@ function formatTotalScore(score) {
     return score;
 }
 socket.on('gameState', (state) => {
-    // Atpažįstame įvykius garsams
     if (lastState) {
         if (state.trickCards.length > lastState.trickCards.length) {
             playSound('card');
@@ -307,8 +291,7 @@ function renderControls(state) {
     } else if (state.phase === 'GAME_OVER' && state.mySeatIndex === 0) {
         addButton('Žaisti naują žaidimą 🔄', 'success', () => socket.emit('startGame', currentRoomCode));
     }
-}
-    // Vienkartinė pagalba „Duoti pliusą“ (matoma per varžytines arba prieš pradedant mesti kortas)
+
     const canGivePlus = !state.myUsedPlus && (
         state.phase === 'BIDDING' ||
         ((state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID') && amIHighestBidder)
@@ -321,6 +304,7 @@ function renderControls(state) {
             }
         });
     }
+}
 
 function renderTableCenter(state) {
     const title = document.getElementById('centerTitle');
@@ -394,58 +378,51 @@ function renderMyCards(state) {
                         socket.emit('discardCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
                     } else if (state.phase === 'PLAYING') {
                         socket.emit('playCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
-                    }
-                });
-            }
-        } else {
-            div.className = 'card hidden';
-        }
-        container.appendChild(div);
-    });
 }
-
+});
+}
+} else {
+div.className = 'card hidden';
+}
+container.appendChild(div);
+});
+}
 function renderDiscarded(state) {
-    const info = document.getElementById('discardInfo');
-    const container = document.getElementById('discardedCards');
-    container.innerHTML = '';
-
-    if (state.discardedCount === 0) {
-        info.innerText = 'Kol kas nenusimesta';
-        return;
-    }
-
-    const bidderName = state.seats.at(state.highestBidderIndex).name;
-    const canUndo = (state.highestBidderIndex === state.mySeatIndex) && (state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID');
-
-    if (state.discardedPile.length > 0) {
-        info.innerText = canUndo
-            ? 'Tavo nusimestos (+' + state.discardedPoints + ' tšk.) – paspausk, jei nori susigrąžinti:'
-            : 'Tavo nusimestos (+' + state.discardedPoints + ' tšk.):';
-
-        state.discardedPile.forEach((c, idx) => {
-            const div = document.createElement('div');
-            div.className = 'card small ' + (c.isRed ? 'red' : '') + (canUndo ? ' clickable' : '');
-            div.innerHTML = '<div>' + c.name + '</div><div>' + c.suit + '</div>';
-            if (canUndo) {
-                div.title = 'Paspausk, kad sugrąžintum į ranką';
-                div.addEventListener('click', () => {
-                    playSound('card');
-                    socket.emit('undiscardCard', { roomCode: currentRoomCode, discardIndex: idx });
-                });
-            }
-            container.appendChild(div);
-        });
-    } else {
-        info.innerText = bidderName + ' nusimetė (+' + state.discardedPoints + ' tšk.)';
-        for (let i = 0; i < state.discardedCount; i++) {
-            const div = document.createElement('div');
-            div.className = 'card small hidden';
-            container.appendChild(div);
-        }
-    }
+const info = document.getElementById('discardInfo');
+const container = document.getElementById('discardedCards');
+container.innerHTML = '';
+if (state.discardedCount === 0) {
+info.innerText = 'Kol kas nenusimesta';
+return;
 }
-
-// Susirašinėjimo (Chat) valdymas
+const bidderName = state.seats.at(state.highestBidderIndex).name;
+const canUndo = (state.highestBidderIndex === state.mySeatIndex) && (state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID');
+if (state.discardedPile.length > 0) {
+info.innerText = canUndo
+? 'Tavo nusimestos (+' + state.discardedPoints + ' tšk.) – paspausk, jei nori susigrąžinti:'
+: 'Tavo nusimestos (+' + state.discardedPoints + ' tšk.):';
+state.discardedPile.forEach((c, idx) => {
+const div = document.createElement('div');
+div.className = 'card small ' + (c.isRed ? 'red' : '') + (canUndo ? ' clickable' : '');
+div.innerHTML = '' + c.name + '' + c.suit + '';
+if (canUndo) {
+div.title = 'Paspausk, kad sugrąžintum į ranką';
+div.addEventListener('click', () => {
+playSound('card');
+socket.emit('undiscardCard', { roomCode: currentRoomCode, discardIndex: idx });
+});
+}
+container.appendChild(div);
+});
+} else {
+info.innerText = bidderName + ' nusimetė (+' + state.discardedPoints + ' tšk.)';
+for (let i = 0; i < state.discardedCount; i++) {
+const div = document.createElement('div');
+div.className = 'card small hidden';
+container.appendChild(div);
+}
+}
+}
 function sendChatMessage(textToSend) {
 if (!currentRoomCode) return;
 const input = document.getElementById('chatInput');

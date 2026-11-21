@@ -571,4 +571,37 @@ socket.on('gameState', (state) => {
         triggerConfettiAnimation();
     }
 });
+// --- AUTOMATINIS PNG IKONĖLĖS GENERAVIMAS TELEFONAMS ---
+(function generateAppIcon() {
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+
+        // Tamsiai žalias stalo fonas
+        ctx.fillStyle = '#064e3b';
+        ctx.fillRect(0, 0, 512, 512);
+
+        // Auksinis rėmelis
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 22;
+        ctx.strokeRect(24, 24, 464, 464);
+
+        // Užrašas 1000
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = '900 135px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('1000', 256, 225);
+
+        // Kryžiaus simbolis
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '180px Arial, sans-serif';
+        ctx.fillText('♣', 256, 405);
+
+        const pngUrl = canvas.toDataURL('image/png');
+        document.querySelectorAll('link[rel*="icon"]').forEach(el => el.href = pngUrl);
+    } catch (e) {}
+})();
 // PABAIGA
+

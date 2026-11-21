@@ -3,25 +3,136 @@ const socket = io();
 let selectedAvatar = '👨';
 let currentRoomCode = null;
 let lastState = null;
+let soundEnabled = true;
+
+// --- GARSO GENERATORIUS (Web Audio API) ---
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function initAudio() {
+    if (!audioCtx) audioCtx = new AudioCtx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playSound(type) {
+    if (!soundEnabled) return;
+    try {
+        initAudio();
+        const now = audioCtx.currentTime;
+
+        if (type === 'card') {
+            // Kortos šlamesio garsas
+            const bufferSize = audioCtx.sampleRate * 0.08;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1200;
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.35, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            noise.start(now);
+        } else if (type === 'bid') {
+            // Statymo garsas
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(520, now);
+            osc.frequency.exponentialRampToValueAtTime(780, now + 0.07);
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.07);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.07);
+        } else if (type === 'marriage') {
+            // Karališkas poros paskelbimo akordas
+            [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+                gain.gain.setValueAtTime(0.18, now + idx * 0.06);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.45);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now + idx * 0.06);
+                osc.stop(now + idx * 0.06 + 0.45);
+            });
+        } else if (type === 'chat') {
+            // Žinutės pyptelėjimas
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, now);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.12);
+        } else if (type === 'win') {
+            // Pergalės garsas
+            [440, 554.37, 659.25, 880].forEach((freq, idx) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+                gain.gain.setValueAtTime(0.18, now + idx * 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.5);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now + idx * 0.1);
+                osc.stop(now + idx * 0.1 + 0.5);
+            });
+        }
+    } catch (e) {}
+}
+
+// Sukuriame garso įjungimo/išjungimo mygtuką viršuje
+const soundBtn = document.createElement('button');
+soundBtn.innerText = '🔊 Garsas: ĮJUNGTAS';
+soundBtn.style.cssText = 'position:fixed; top:10px; right:10px; padding:6px 12px; font-size:12px; z-index:999; background:#1e293b; color:#fbbf24; border:1px solid #fbbf24;';
+soundBtn.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    soundBtn.innerText = soundEnabled ? '🔊 Garsas: ĮJUNGTAS' : '🔇 Garsas: IŠJUNGTAS';
+    if (soundEnabled) playSound('bid');
+});
+document.body.appendChild(soundBtn);
 
 document.getElementById('lobbyMale').addEventListener('click', () => {
+    initAudio();
     selectedAvatar = '👨';
     document.getElementById('lobbyMale').classList.add('active-avatar');
     document.getElementById('lobbyFemale').classList.remove('active-avatar');
 });
 
 document.getElementById('lobbyFemale').addEventListener('click', () => {
+    initAudio();
     selectedAvatar = '👩';
     document.getElementById('lobbyFemale').classList.add('active-avatar');
     document.getElementById('lobbyMale').classList.remove('active-avatar');
 });
 
 document.getElementById('createRoomBtn').addEventListener('click', () => {
+    initAudio();
     const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
     socket.emit('createRoom', { playerName: name, avatar: selectedAvatar });
 });
 
 document.getElementById('joinRoomBtn').addEventListener('click', () => {
+    initAudio();
     const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
     const code = document.getElementById('roomCodeInput').value.trim();
     if (!code) {
@@ -47,8 +158,24 @@ function formatTotalScore(score) {
     if (score >= 900 && score < 1000) return score + ' 🛢️ (Statinė)';
     return score;
 }
-
 socket.on('gameState', (state) => {
+    // Atpažįstame įvykius garsams
+    if (lastState) {
+        if (state.trickCards.length > lastState.trickCards.length) {
+            playSound('card');
+        } else if (state.phase === 'BIDDING' && lastState.phase !== 'BIDDING') {
+            playSound('card');
+        } else if (state.currentBid > lastState.currentBid) {
+            playSound('bid');
+        }
+        if (state.trumpSuit && state.trumpSuit !== lastState.trumpSuit) {
+            playSound('marriage');
+        }
+        if ((state.phase === 'ROUND_OVER' || state.phase === 'GAME_OVER') && lastState.phase === 'PLAYING') {
+            playSound('win');
+        }
+    }
+
     lastState = state;
     currentRoomCode = state.roomCode;
 
@@ -114,7 +241,7 @@ function renderControls(state) {
         }
     } else if (state.phase === 'BIDDING' && isMyTurn) {
         if (!state.myCardsRevealed) {
-            addButton('👀 Atversti kortas', '', () => socket.emit('revealCards', currentRoomCode));
+            addButton('👀 Atversti kortas', '', () => { playSound('card'); socket.emit('revealCards', currentRoomCode); });
             addButton('🙈 Statyti AKLAI (' + (state.currentBid + 10) + ') [x2]', 'success', () => {
                 socket.emit('placeBid', { roomCode: currentRoomCode, blind: true });
             });
@@ -124,7 +251,7 @@ function renderControls(state) {
             });
         }
         if (!amIHighestBidder || state.currentBid > 100) {
-            addButton('Pasuoti', 'danger', () => socket.emit('passBid', currentRoomCode));
+            addButton('Pasuoti', 'danger', () => { playSound('bid'); socket.emit('passBid', currentRoomCode); });
         }
     } else if (state.phase === 'RAISE_BID' && amIHighestBidder) {
         if (state.currentBid - 20 >= state.minBidAfterWin) {
@@ -133,7 +260,7 @@ function renderControls(state) {
         if (state.currentBid - 10 >= state.minBidAfterWin) {
             addButton('🔽 -10 (' + (state.currentBid - 10) + ')', 'danger', () => socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: -10 }));
         }
-        addButton('✅ Pradėti žaidimą su ' + state.currentBid, 'success', () => socket.emit('confirmBidAndPlay', currentRoomCode));
+        addButton('✅ Pradėti žaidimą su ' + state.currentBid, 'success', () => { playSound('bid'); socket.emit('confirmBidAndPlay', currentRoomCode); });
         if (state.currentBid + 10 <= 300) {
             addButton('📈 +10 (' + (state.currentBid + 10) + ')', '', () => socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: 10 }));
         }
@@ -217,28 +344,32 @@ function renderMyCards(state) {
             div.innerHTML = '<div>' + item.card.name + '</div><div>' + item.card.suit + '</div>';
             if (canClick) {
                 div.addEventListener('click', () => {
-if (state.phase === 'DISCARD_3') {
-socket.emit('discardCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
-} else if (state.phase === 'PLAYING') {
-socket.emit('playCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
+                    if (state.phase === 'DISCARD_3') {
+                        playSound('card');
+                        socket.emit('discardCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
+                    } else if (state.phase === 'PLAYING') {
+                        socket.emit('playCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
+                    }
+                });
+            }
+        } else {
+            div.className = 'card hidden';
+        }
+        container.appendChild(div);
+    });
 }
-});
-}
-} else {
-div.className = 'card hidden';
-}
-container.appendChild(div);
-});
-}
+
 function renderDiscarded(state) {
-const info = document.getElementById('discardInfo');
-const container = document.getElementById('discardedCards');
-container.innerHTML = '';
-if (state.discardedCount === 0) {
-info.innerText = 'Kol kas nenusimesta';
-return;
-}
-const bidderName = state.seats.at(state.highestBidderIndex).name;
+    const info = document.getElementById('discardInfo');
+    const container = document.getElementById('discardedCards');
+    container.innerHTML = '';
+
+    if (state.discardedCount === 0) {
+        info.innerText = 'Kol kas nenusimesta';
+        return;
+    }
+
+    const bidderName = state.seats.at(state.highestBidderIndex).name;
 if (state.discardedPile.length > 0) {
 info.innerText = 'Tavo nusimestos (+' + state.discardedPoints + ' tšk.):';
 state.discardedPile.forEach(c => {
@@ -258,40 +389,36 @@ container.appendChild(div);
 }
 // Susirašinėjimo (Chat) valdymas
 function sendChatMessage(textToSend) {
-    if (!currentRoomCode) return;
-    const input = document.getElementById('chatInput');
-    const msg = textToSend || input.value.trim();
-    if (!msg) return;
-
-    socket.emit('sendChat', { roomCode: currentRoomCode, message: msg });
-    if (!textToSend) input.value = '';
+if (!currentRoomCode) return;
+const input = document.getElementById('chatInput');
+const msg = textToSend || input.value.trim();
+if (!msg) return;
+socket.emit('sendChat', { roomCode: currentRoomCode, message: msg });
+if (!textToSend) input.value = '';
 }
-
 const chatBtn = document.getElementById('chatSendBtn');
 if (chatBtn) {
-    chatBtn.addEventListener('click', () => sendChatMessage());
+chatBtn.addEventListener('click', () => sendChatMessage());
 }
-
 const chatInp = document.getElementById('chatInput');
 if (chatInp) {
-    chatInp.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendChatMessage();
-    });
-}
-
-document.querySelectorAll('.emoji-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        sendChatMessage(btn.getAttribute('data-emoji'));
-    });
+chatInp.addEventListener('keypress', (e) => {
+if (e.key === 'Enter') sendChatMessage();
 });
-
+}
+document.querySelectorAll('.emoji-btn').forEach(btn => {
+btn.addEventListener('click', () => {
+sendChatMessage(btn.getAttribute('data-emoji'));
+});
+});
 socket.on('chatMessage', ({ sender, avatar, text }) => {
-    const box = document.getElementById('chatMessages');
-    if (!box) return;
-    const div = document.createElement('div');
-    div.className = 'chat-msg';
-    div.innerHTML = '<div class="chat-sender">' + avatar + ' ' + sender + ':</div><div>' + text + '</div>';
-    box.appendChild(div);
-    box.scrollTop = box.scrollHeight;
+playSound('chat');
+const box = document.getElementById('chatMessages');
+if (!box) return;
+const div = document.createElement('div');
+div.className = 'chat-msg';
+div.innerHTML = '' + avatar + ' ' + sender + ':' + text + '';
+box.appendChild(div);
+box.scrollTop = box.scrollHeight;
 });
 // PABAIGA

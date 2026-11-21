@@ -1,9 +1,31 @@
 const socket = io();
 
+// Sugeneruojame arba nuskaitome nuolatinį žaidėjo raktą telefone
+let playerToken = localStorage.getItem('tukstantis_token');
+if (!playerToken) {
+    playerToken = 'plr_' + Math.random().toString(36).substring(2, 12) + Date.now();
+    localStorage.setItem('tukstantis_token', playerToken);
+}
+
 let selectedAvatar = '👨';
-let currentRoomCode = null;
+let currentRoomCode = sessionStorage.getItem('tukstantis_room') || null;
 let lastState = null;
 let soundEnabled = true;
+
+// Kai tik atsidaro puslapis arba grįžtama iš Messenger, prisijungiame atgal į kambarį
+socket.on('connect', () => {
+    if (currentRoomCode) {
+        socket.emit('rejoinRoom', { roomCode: currentRoomCode, playerToken: playerToken });
+    }
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && currentRoomCode) {
+        if (!socket.connected) socket.connect();
+        socket.emit('rejoinRoom', { roomCode: currentRoomCode, playerToken: playerToken });
+    }
+});
+
 
 // --- GARSO GENERATORIUS (Web Audio API) ---
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -128,7 +150,7 @@ document.getElementById('lobbyFemale').addEventListener('click', () => {
 document.getElementById('createRoomBtn').addEventListener('click', () => {
     initAudio();
     const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
-    socket.emit('createRoom', { playerName: name, avatar: selectedAvatar });
+    socket.emit('createRoom', { playerName: name, avatar: selectedAvatar, playerToken: playerToken });
 });
 
 document.getElementById('joinRoomBtn').addEventListener('click', () => {
@@ -139,10 +161,14 @@ document.getElementById('joinRoomBtn').addEventListener('click', () => {
         alert('Įrašyk kambario kodą!');
         return;
     }
-    socket.emit('joinRoom', { roomCode: code, playerName: name, avatar: selectedAvatar });
+    socket.emit('joinRoom', { roomCode: code, playerName: name, avatar: selectedAvatar, playerToken: playerToken });
+});
+
+     socket.emit('joinRoom', { roomCode: code, playerName: name, avatar: selectedAvatar, playerToken: playerToken });
 });
 
 socket.on('errorMsg', (msg) => {
+
     alert(msg);
 });
 
@@ -178,6 +204,7 @@ socket.on('gameState', (state) => {
 
     lastState = state;
     currentRoomCode = state.roomCode;
+    sessionStorage.setItem('tukstantis_room', state.roomCode);
 
     document.getElementById('lobbyScreen').style.display = 'none';
     document.getElementById('gameScreen').style.display = 'flex';

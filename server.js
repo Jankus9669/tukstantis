@@ -197,7 +197,7 @@ function finishBidding(roomCode) {
     broadcastState(roomCode);
 
     setTimeout(() => {
-        winner.cardsRevealed = true;
+        room.seats.forEach(s => s.cardsRevealed = true);
         winner.hand.push(...room.talon);
         room.talon = [];
         room.showTalon = false;

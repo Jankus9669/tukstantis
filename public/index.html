@@ -20,8 +20,6 @@
             overflow-x: hidden;
         }
         h1 { margin: 0 0 10px 0; font-size: 22px; color: #fbbf24; }
-        
-        /* Prisijungimo langas (Lobby) */
         .lobby-card {
             background: rgba(15, 23, 42, 0.92);
             border: 2px solid #fbbf24;
@@ -50,8 +48,6 @@
             background: #0f172a; padding: 0 10px; font-size: 12px; color: #94a3b8;
             position: relative; top: -9px;
         }
-
-        /* Žaidimo stalo stiliai */
         #gameScreen { display: none; width: 100%; flex-direction: column; align-items: center; }
         .room-banner {
             background: rgba(251, 191, 36, 0.15);
@@ -76,14 +72,14 @@
             display: flex;
             align-items: flex-start;
             justify-content: center;
-            gap: 20px;
+            gap: 18px;
             width: 100%;
-            max-width: 1200px;
+            max-width: 1220px;
             flex-wrap: wrap;
         }
         .poker-table {
             position: relative;
-            width: 860px;
+            width: 840px;
             max-width: 100%;
             min-height: 470px;
             background: radial-gradient(ellipse at center, #1b6b4a 0%, #0d422c 100%);
@@ -264,7 +260,9 @@
         button.active-avatar { background-color: #10b981; color: white; border: 2px solid white; }
         button.danger { background-color: #ef4444; color: white; }
         button.success { background-color: #10b981; color: white; }
-        .side-column { display: flex; flex-direction: column; gap: 12px; width: 220px; }
+        
+        /* Šoninė kolona ir susirašinėjimas (Chat) */
+        .side-column { display: flex; flex-direction: column; gap: 12px; width: 250px; }
         .side-panel {
             background: rgba(15, 23, 42, 0.9);
             border: 2px solid rgba(251, 191, 36, 0.45);
@@ -279,6 +277,55 @@
             border-bottom: 1px solid rgba(255,255,255,0.15);
             padding-bottom: 5px;
         }
+        .chat-messages {
+            height: 150px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 10px;
+            padding: 8px;
+            text-align: left;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .chat-msg {
+            background: rgba(30, 41, 59, 0.9);
+            padding: 5px 8px;
+            border-radius: 8px;
+            line-height: 1.3;
+            word-wrap: break-word;
+        }
+        .chat-sender { color: #fbbf24; font-weight: bold; font-size: 12px; }
+        .emoji-bar {
+            display: flex;
+            justify-content: space-between;
+            gap: 4px;
+            margin-bottom: 6px;
+        }
+        .emoji-btn {
+            padding: 4px 6px;
+            font-size: 15px;
+            background: #1e293b;
+            color: white;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            flex: 1;
+        }
+        .chat-input-row { display: flex; gap: 5px; }
+        .chat-input {
+            flex: 1;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            background: #1e293b;
+            color: white;
+            font-size: 13px;
+            min-width: 0;
+        }
+        .chat-send-btn { padding: 8px 12px; font-size: 13px; }
+
         .discard-info { font-size: 12px; color: #cbd5e1; margin-bottom: 8px; }
         .suit-table { width: 100%; border-collapse: collapse; font-size: 14px; }
         .suit-table td { padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.08); }
@@ -314,8 +361,8 @@
             .player-seat { padding: 8px 6px; border-radius: 16px; }
             .player-seat h3 { font-size: 12px; }
             button { padding: 10px 12px; font-size: 13px; flex: 1 1 auto; }
-            .side-column { width: 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; }
-            .side-panel { width: 48%; min-width: 150px; padding: 10px; }
+            .side-column { width: 100%; max-width: 500px; }
+            .side-panel { width: 100%; padding: 10px; }
         }
     </style>
 </head>
@@ -323,7 +370,6 @@
 
     <h1>Kortų klubas „TŪKSTANTIS“ <span id="trumpBadge" class="trump-badge" style="display:none;">Koziris: -</span></h1>
 
-    <!-- KAMBARIO KŪRIMO IR PRISIJUNGIMO LANGAS -->
     <div id="lobbyScreen" class="lobby-card">
         <h2>Sveikas atvykęs prie stalo!</h2>
         <input type="text" id="playerNameInput" class="lobby-input" placeholder="Įrašyk savo vardą..." maxlength="15">
@@ -342,7 +388,6 @@
         <button id="joinRoomBtn" style="width: 100%; font-size: 16px;">🚪 Prisijungti prie kambario</button>
     </div>
 
-    <!-- ŽAIDIMO STALO LANGAS -->
     <div id="gameScreen">
         <div class="room-banner">
             Kambario kodas: <strong id="displayRoomCode" style="font-size: 17px; letter-spacing: 2px;">----</strong> (Padiktuok draugams!)
@@ -398,6 +443,30 @@
 
             <div class="side-column">
                 <div class="side-panel">
+                    <h4>💬 Susirašinėjimas</h4>
+                    <div class="chat-messages" id="chatMessages">
+                        <div style="color: #94a3b8; font-size: 12px;">Rašyk žinutę draugams prie stalo...</div>
+                    </div>
+                                        <div class="emoji-bar">
+                        <button class="emoji-btn" data-emoji="😂">😂</button>
+                        <button class="emoji-btn" data-emoji="👏">👏</button>
+                        <button class="emoji-btn" data-emoji="🔥">🔥</button>
+                        <button class="emoji-btn" data-emoji="😱">😱</button>
+                        <button class="emoji-btn" data-emoji="👍">👍</button>
+                    </div>
+                    <div class="chat-input-row">
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Tavo žinutė..." maxlength="120">
+                        <button id="chatSendBtn" class="success chat-send-btn">Siųsti</button>
+                    </div>
+                </div>
+
+                <div class="side-panel">
+                    <h4>🗂️ Nusimestos 3 kortos</h4>
+                    <div class="discard-info" id="discardInfo">Kol kas nenusimesta</div>
+                    <div class="cards-container" id="discardedCards" style="min-height: 72px;"></div>
+                </div>
+
+                <div class="side-panel">
                     <h4>👑 Simbolių (Porų) vertės</h4>
                     <table class="suit-table">
                         <tr><td class="suit-name black-suit">♣ Kryžiai</td><td class="suit-pts">100 tšk.</td></tr>
@@ -411,12 +480,6 @@
                         Q – 3 | J – 2 | 9 – 0
                     </div>
                 </div>
-
-                <div class="side-panel">
-                    <h4>🗂️ Nusimestos 3 kortos</h4>
-                    <div class="discard-info" id="discardInfo">Kol kas nenusimesta</div>
-                    <div class="cards-container" id="discardedCards" style="min-height: 72px;"></div>
-                </div>
             </div>
         </div>
     </div>
@@ -425,3 +488,4 @@
     <script src="game.js"></script>
 </body>
 </html>
+

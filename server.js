@@ -518,6 +518,22 @@ return;
 seat.hand.splice(cardIndex, 1);
 executePlayCard(roomCode, seatIdx, card);
 });
+    socket.on('sendChat', ({ roomCode, message }) => {
+        const room = rooms[roomCode];
+        if (!room || !message) return;
+        const seat = room.seats.find(s => s.socketId === socket.id);
+        if (!seat) return;
+
+        const cleanMsg = message.trim().slice(0, 120);
+        if (cleanMsg.length > 0) {
+            io.to(roomCode).emit('chatMessage', {
+                sender: seat.name,
+                avatar: seat.avatar,
+                text: cleanMsg
+            });
+        }
+    });
+
 });
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

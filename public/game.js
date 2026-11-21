@@ -256,4 +256,42 @@ container.appendChild(div);
 }
 }
 }
+// Susirašinėjimo (Chat) valdymas
+function sendChatMessage(textToSend) {
+    if (!currentRoomCode) return;
+    const input = document.getElementById('chatInput');
+    const msg = textToSend || input.value.trim();
+    if (!msg) return;
+
+    socket.emit('sendChat', { roomCode: currentRoomCode, message: msg });
+    if (!textToSend) input.value = '';
+}
+
+const chatBtn = document.getElementById('chatSendBtn');
+if (chatBtn) {
+    chatBtn.addEventListener('click', () => sendChatMessage());
+}
+
+const chatInp = document.getElementById('chatInput');
+if (chatInp) {
+    chatInp.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendChatMessage();
+    });
+}
+
+document.querySelectorAll('.emoji-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        sendChatMessage(btn.getAttribute('data-emoji'));
+    });
+});
+
+socket.on('chatMessage', ({ sender, avatar, text }) => {
+    const box = document.getElementById('chatMessages');
+    if (!box) return;
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    div.innerHTML = '<div class="chat-sender">' + avatar + ' ' + sender + ':</div><div>' + text + '</div>';
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+});
 // PABAIGA

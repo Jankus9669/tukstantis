@@ -122,16 +122,21 @@ function playSound(type) {
     } catch (e) {}
 }
 
-// Sukuriame garso įjungimo/išjungimo mygtuką viršuje
+// Sukuriame kompaktišką garso mygtuką kambario kodo juostoje
 const soundBtn = document.createElement('button');
-soundBtn.innerText = '🔊 Garsas: ĮJUNGTAS';
-soundBtn.style.cssText = 'position:fixed; top:10px; right:10px; padding:6px 12px; font-size:12px; z-index:999; background:#1e293b; color:#fbbf24; border:1px solid #fbbf24;';
+soundBtn.innerText = '🔊';
+soundBtn.title = 'Įjungti / išjungti garsą';
+soundBtn.style.cssText = 'margin-left:10px; padding:3px 9px; font-size:14px; background:#1e293b; color:#fbbf24; border:1px solid #fbbf24; border-radius:8px; vertical-align:middle;';
 soundBtn.addEventListener('click', () => {
     soundEnabled = !soundEnabled;
-    soundBtn.innerText = soundEnabled ? '🔊 Garsas: ĮJUNGTAS' : '🔇 Garsas: IŠJUNGTAS';
+    soundBtn.innerText = soundEnabled ? '🔊' : '🔇';
     if (soundEnabled) playSound('bid');
 });
-document.body.appendChild(soundBtn);
+const roomBannerEl = document.querySelector('.room-banner');
+if (roomBannerEl) {
+    roomBannerEl.appendChild(soundBtn);
+}
+
 
 document.getElementById('lobbyMale').addEventListener('click', () => {
     initAudio();
@@ -303,6 +308,19 @@ function renderControls(state) {
         addButton('Žaisti naują žaidimą 🔄', 'success', () => socket.emit('startGame', currentRoomCode));
     }
 }
+    // Vienkartinė pagalba „Duoti pliusą“ (matoma per varžytines arba prieš pradedant mesti kortas)
+    const canGivePlus = !state.myUsedPlus && (
+        state.phase === 'BIDDING' ||
+        ((state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID') && amIHighestBidder)
+    );
+    if (canGivePlus) {
+        addButton('➕ Duoti pliusą (kitiems po +60 tšk.)', 'danger', () => {
+            if (confirm('Ar tikrai nori panaudoti savo vienkartinę pagalbą „Duoti pliusą“? Likusiems žaidėjams bus pridėta po +60 taškų.')) {
+                playSound('bid');
+                socket.emit('givePlus', currentRoomCode);
+            }
+        });
+    }
 
 function renderTableCenter(state) {
     const title = document.getElementById('centerTitle');

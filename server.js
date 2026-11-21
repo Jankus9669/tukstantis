@@ -99,7 +99,8 @@ function broadcastState(roomCode) {
                 cardCount: s.hand.length,
                 bidStatus: s.bidStatus,
                 cardsRevealed: s.cardsRevealed,
-                isBlind: s.isBlind
+                isBlind: s.isBlind,
+                usedPlus: !!s.usedPlus
             }));
 
             io.to(seat.socketId).emit('gameState', {
@@ -108,6 +109,7 @@ function broadcastState(roomCode) {
                 myHand: seat.hand,
                 myCardsRevealed: seat.cardsRevealed,
                 myIsBlind: seat.isBlind,
+                myUsedPlus: !!seat.usedPlus,
                 seats: publicSeats,
                 phase: room.phase,
                 statusText: room.statusText,
@@ -197,6 +199,7 @@ function finishBidding(roomCode) {
     broadcastState(roomCode);
 
     setTimeout(() => {
+        if (!rooms[roomCode] || room.phase !== 'BIDDING') return;
         room.seats.forEach(s => s.cardsRevealed = true);
         winner.hand.push(...room.talon);
         room.talon = [];
@@ -327,6 +330,7 @@ function checkBotAction(roomCode) {
     if (!activeSeat || !activeSeat.isBot) return;
 
     setTimeout(() => {
+        if (!rooms[roomCode] || room.phase === 'ROUND_OVER' || room.phase === 'GAME_OVER') return;
         if (room.phase === 'BIDDING') {
             if (room.currentBid + 10 <= activeSeat.maxBid) {
                 room.currentBid += 10;
@@ -377,10 +381,10 @@ function executePlayCard(roomCode, seatIdx, card) {
     room.trickCards.push({ seatIndex: seatIdx, card: card });
     broadcastState(roomCode);
 
-    if (room.trickCards.length === 3) {
-        evaluateTrick(roomCode);
-    } else {
-        room.currentTurnIndex = (seatIdx + 1) % 3;
+if (room.trickCards.length === 3) {
+evaluateTrick(roomCode);
+} else {
+room.currentTurnIndex = (seatIdx + 1) % 3;
 broadcastState(roomCode);
 checkBotAction(roomCode);
 }
@@ -394,9 +398,9 @@ phase: 'LOBBY',
 statusText: 'Kambarys sukurtas! Laukia žaidėjų arba spausk „Pradėti žaidimą“.',
 roundStarterIndex: 0,
 seats: [
-{ socketId: socket.id, playerToken: playerToken, name: playerName || 'Žaidėjas 1', avatar: avatar || '👨', isBot: false, totalScore: 0, roundScore: 0, bidStatus: '-', hand: [] },
-{ socketId: null, playerToken: null, name: 'Tomas (Botas)', avatar: '🧔‍♂️', isBot: true, totalScore: 0, roundScore: 0, bidStatus: '-', hand: [] },
-{ socketId: null, playerToken: null, name: 'Ieva (Botas)', avatar: '👩‍🦰', isBot: true, totalScore: 0, roundScore: 0, bidStatus: '-', hand: [] }
+{ socketId: socket.id, playerToken: playerToken, name: playerName || 'Žaidėjas 1', avatar: avatar || '👨', isBot: false, totalScore: 0, roundScore: 0, bidStatus: '-', usedPlus: false, hand: [] },
+{ socketId: null, playerToken: null, name: 'Tomas (Botas)', avatar: '🧔‍♂️', isBot: true, totalScore: 0, roundScore: 0, bidStatus: '-', usedPlus: false, hand: [] },
+{ socketId: null, playerToken: null, name: 'Ieva (Botas)', avatar: '👩‍🦰', isBot: true, totalScore: 0, roundScore: 0, bidStatus: '-', usedPlus: false, hand: [] }
 ]
 };
 socket.join(code);
@@ -409,7 +413,6 @@ if (!room) {
 socket.emit('errorMsg', 'Kambarys su tokiu kodu nerastas!');
 return;
 }
-// Tikriname, ar šis žaidėjas jau sėdėjo šiame kambaryje (pvz. grįžo iš Messenger)
 const existingSeat = room.seats.find(s => !s.isBot && s.playerToken === playerToken);
 if (existingSeat) {
 existingSeat.socketId = socket.id;
@@ -435,12 +438,12 @@ isBot: false,
 totalScore: 0,
 roundScore: 0,
 bidStatus: '-',
+usedPlus: false,
 hand: []
 };
 socket.join(code);
 broadcastState(code);
 });
-// Automatinis sugrįžimas atnaujinus naršyklę ar grįžus iš kitos programėlės
 socket.on('rejoinRoom', ({ roomCode, playerToken }) => {
 const code = (roomCode || '').toUpperCase().trim();
 const room = rooms[code];
@@ -455,12 +458,50 @@ broadcastState(code);
 socket.on('startGame', (roomCode) => {
 const room = rooms[roomCode];
 if (!room) return;
-room.seats.forEach(s => s.totalScore = 0);
+room.seats.forEach(s => {
+s.totalScore = 0;
+s.usedPlus = false; // Naujame žaidime pagalba vėl atsinaujina
+});
 room.roundStarterIndex = 0;
 startRound(roomCode);
 });
 socket.on('nextRound', (roomCode) => {
 startRound(roomCode);
+});
+// Pagalba: Duoti pliusą (1 kartą per žaidimą, kitiems po +60 taškų)
+socket.on('givePlus', (roomCode) => {
+const room = rooms[roomCode];
+if (!room) return;
+if (room.phase !== 'BIDDING' && room.phase !== 'DISCARD_3' && room.phase !== 'RAISE_BID') return;
+const seatIdx = room.seats.findIndex(s => s.socketId === socket.id);
+if (seatIdx === -1) return;
+const giver = room.seats[seatIdx];
+if (giver.usedPlus) {
+socket.emit('errorMsg', 'Šią pagalbą („Duoti pliusą“) šiame žaidime jau panaudojai!');
+return;
+}
+giver.usedPlus = true;
+room.phase = 'ROUND_OVER';
+room.talon = [];
+room.showTalon = false;
+room.trickCards = [];
+room.seats.forEach(s => s.cardsRevealed = true);
+let infoMsg = '➕ ' + giver.name + ' pasinaudojo vienkartine pagalba „DUOTI PLIUSĄ“! Likusiems žaidėjams pridedama po +60 taškų. ';
+room.seats.forEach((s, idx) => {
+if (idx !== seatIdx) {
+if (s.totalScore >= 900) {
+infoMsg += s.name + ' sėdi ant statinės (900). ';
+} else if (s.totalScore + 60 >= 900) {
+s.totalScore = 900;
+infoMsg += s.name + ' pasiekė statinę (900)! ';
+} else {
+s.totalScore += 60;
+}
+}
+});
+room.roundStarterIndex = (room.roundStarterIndex + 1) % 3;
+room.statusText = infoMsg;
+broadcastState(roomCode);
 });
 socket.on('revealCards', (roomCode) => {
 const room = rooms[roomCode];

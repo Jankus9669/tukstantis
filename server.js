@@ -115,13 +115,10 @@ function broadcastState(roomCode) {
                 trumpSuit: room.trumpSuit,
                 talon: room.showTalon ? room.talon : [],
                 talonCount: (room.talon || []).length,
-                trickCards: room.trickCards,
+                trickCards: room.trickCards || [],
                 discardedPile: (room.highestBidderIndex === seatIdx) ? (room.discardedPile || []) : [],
                 discardedCount: (room.discardedPile || []).length,
                 discardedPoints: (room.discardedPile || []).reduce((sum, c) => sum + c.value, 0)
-
-                
-                
             });
         }
     });
@@ -271,7 +268,8 @@ function finishRound(roomCode) {
 
     const bidder = room.seats[room.highestBidderIndex];
     const bidWon = bidder.roundScore >= room.currentBid;
-    const mult = bidder.isBlind ? 2 : 1;
+    const isBlindRound = bidder.isBlind;
+    const mult = isBlindRound ? 2 : 1;
 
     if (bidWon) {
         const earned = room.currentBid * mult;
@@ -283,9 +281,14 @@ function finishRound(roomCode) {
         summary += bidder.name + ' SUDEGĖ (' + bidder.roundScore + '/' + room.currentBid + ') -' + lost + ' tšk.! ';
     }
 
+    if (isBlindRound) {
+        summary += '[Aklas žaidimas: kitų taškai x2!] ';
+    }
+
+    // Kitiems žaidėjams taškai irgi dvigubinami, jei šaukėjas ėjo aklai
     room.seats.forEach((s, idx) => {
         if (idx !== room.highestBidderIndex) {
-            let rounded = Math.round(s.roundScore / 5) * 5;
+            let rounded = (Math.round(s.roundScore / 5) * 5) * mult;
             if (s.totalScore >= 900) {
                 summary += s.name + ' ant statinės (900). ';
             } else if (s.totalScore + rounded >= 900) {
@@ -298,8 +301,18 @@ function finishRound(roomCode) {
     });
 
     room.roundStarterIndex = (room.roundStarterIndex + 1) % 3;
+
+    // 1. Tikriname, ar kas nors surinko -500 arba mažiau
+    const loser = room.seats.find(s => s.totalScore <= -500);
+    // 2. Tikriname, ar kas nors pasiekė 1000
     const gameWinner = room.seats.find(s => s.totalScore >= 1000);
-    if (gameWinner) {
+
+    if (loser) {
+        room.phase = 'GAME_OVER';
+        // Randame žaidėją, tuo metu turintį daugiausiai taškų
+        const topPlayer = [...room.seats].sort((a, b) => b.totalScore - a.totalScore).at(0);
+        room.statusText = '💥 ' + loser.name + ' pasiekė ' + loser.totalScore + ' taškų ir PRALAIMĖJO! 🏆 Laimėjo ' + topPlayer.name + ' (' + topPlayer.totalScore + ' tšk.)!';
+    } else if (gameWinner) {
         room.phase = 'GAME_OVER';
         room.statusText = '🏆 ' + gameWinner.name + ' LAIMĖJO ŽAIDIMĄ pasiekęs ' + gameWinner.totalScore + ' taškų!';
     } else {
@@ -359,36 +372,32 @@ function executePlayCard(roomCode, seatIdx, card) {
             let bonus = getMarriageBonus(card.suit);
             seat.roundScore += bonus;
             room.statusText = '👑 ' + seat.name + ' skelbia PORĄ (' + card.suit + ') +' + bonus + ' tšk.! Koziris: ' + room.trumpSuit;
-        }
-    }
-
-    room.trickCards.push({ seatIndex: seatIdx, card: card });
-    broadcastState(roomCode);
-
-    if (room.trickCards.length === 3) {
-        evaluateTrick(roomCode);
-    } else {
-        room.currentTurnIndex = (seatIdx + 1) % 3;
-        broadcastState(roomCode);
-        checkBotAction(roomCode);
-    }
 }
-
+}
+room.trickCards.push({ seatIndex: seatIdx, card: card });
+broadcastState(roomCode);
+if (room.trickCards.length === 3) {
+evaluateTrick(roomCode);
+} else {
+room.currentTurnIndex = (seatIdx + 1) % 3;
+broadcastState(roomCode);
+checkBotAction(roomCode);
+}
+}
 io.on('connection', (socket) => {
-    socket.on('createRoom', ({ playerName, avatar }) => {
-        const code = generateRoomCode();
-         rooms[code] = {
-            code: code,
-            phase: 'LOBBY',
-            statusText: 'Kambarys sukurtas! Laukia žaidėjų arba spausk „Pradėti žaidimą“.',
-            roundStarterIndex: 0,
-            seats: [
-                { socketId: socket.id, name: playerName || 'Žaidėjas 1', avatar: avatar || '👨', isBot: false, totalScore: 0, roundScore: 0, bidStatus: '-', hand: [] },
-                { socketId: null, name: 'Tomas (Botas)', avatar: '🧔‍♂️', isBot: true, totalScore: 0, roundScore: 0, bidStatus: '-', hand: [] },
-                { socketId: null, name: 'Ieva (Botas)', avatar: '👩‍🦰', isBot: true, totalScore: 0, roundScore: 0, bidStatus: '-', hand: [] }
-            ]
-        };
-
+socket.on('createRoom', ({ playerName, avatar }) => {
+const code = generateRoomCode();
+rooms[code] = {
+code: code,
+phase: 'LOBBY',
+statusText: 'Kambarys sukurtas! Laukia žaidėjų arba spausk „Pradėti žaidimą“.',
+roundStarterIndex: 0,
+seats: [
+{ socketId: socket.id, name: playerName || 'Žaidėjas 1', avatar: avatar || '👨', isBot: false, totalScore: 0, roundScore: 0, bidStatus: '-', hand: [] },
+{ socketId: null, name: 'Tomas (Botas)', avatar: '🧔‍♂️', isBot: true, totalScore: 0, roundScore: 0, bidStatus: '-', hand: [] },
+{ socketId: null, name: 'Ieva (Botas)', avatar: '👩‍🦰', isBot: true, totalScore: 0, roundScore: 0, bidStatus: '-', hand: [] }
+]
+};
 socket.join(code);
 broadcastState(code);
 });
@@ -415,6 +424,7 @@ avatar: avatar || '👩',
 isBot: false,
 totalScore: 0,
 roundScore: 0,
+bidStatus: '-',
 hand: []
 };
 socket.join(code);

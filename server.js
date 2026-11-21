@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const zlib = require('zlib');
 
 const app = express();
 const server = http.createServer(app);
@@ -11,6 +12,68 @@ const io = new Server(server, {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// --- TIKROS PROGRAMĖLĖS IKONĖLĖS GENERAVIMAS ---
+function createSolidPng(size) {
+    const rawData = Buffer.alloc((size * 4 + 1) * size);
+    for (let y = 0; y < size; y++) {
+        const rowStart = y * (size * 4 + 1);
+        rawData[rowStart] = 0;
+        for (let x = 0; x < size; x++) {
+            const px = rowStart + 1 + x * 4;
+            const isBorder = x < 28 || x >= size - 28 || y < 28 || y >= size - 28;
+            const isInnerGold = (x >= 28 && x < 44) || (x >= size - 44 && x < size - 28) || (y >= 28 && y < 44) || (y >= size - 44 && y < size - 28);
+            const isCenterDiamond = Math.abs(x - size / 2) + Math.abs(y - size / 2) < size * 0.24;
+
+            if (isBorder) {
+                rawData[px] = 15; rawData[px + 1] = 23; rawData[px + 2] = 42; rawData[px + 3] = 255;
+            } else if (isInnerGold || isCenterDiamond) {
+                rawData[px] = 251; rawData[px + 1] = 191; rawData[px + 2] = 36; rawData[px + 3] = 255;
+            } else {
+                rawData[px] = 6; rawData[px + 1] = 78; rawData[px + 2] = 59; rawData[px + 3] = 255;
+            }
+        }
+    }
+
+    const compressed = zlib.deflateSync(rawData);
+    function crc32(buf) {
+        let crc = -1;
+        for (let i = 0; i < buf.length; i++) {
+            crc ^= buf[i];
+            for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+        }
+        return (crc ^ -1) >>> 0;
+    }
+    function makeChunk(type, data) {
+        const typeBuf = Buffer.from(type, 'ascii');
+        const lenBuf = Buffer.alloc(4);
+        lenBuf.writeUInt32BE(data.length, 0);
+        const crcBuf = Buffer.alloc(4);
+        crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
+        return Buffer.concat([lenBuf, typeBuf, data, crcBuf]);
+    }
+
+    const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(size, 0);
+    ihdr.writeUInt32BE(size, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 6;
+    return Buffer.concat([sig, makeChunk('IHDR', ihdr), makeChunk('IDAT', compressed), makeChunk('IEND', Buffer.alloc(0))]);
+}
+
+const cachedIcon192 = createSolidPng(192);
+const cachedIcon512 = createSolidPng(512);
+
+app.get('/icon-192.png', (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': cachedIcon192.length });
+    res.end(cachedIcon192);
+});
+app.get('/icon-512.png', (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': cachedIcon512.length });
+    res.end(cachedIcon512);
+});
+
 const suits = ['♥', '♦', '♣', '♠'];
 const ranks = [
     { name: '9', value: 0, power: 1 },
@@ -407,7 +470,7 @@ function checkBotAction(roomCode) {
                 room.statusText = activeSeat.name + ' pasuoja.';
             }
             advanceBidding(roomCode);
-        } else if (room.phase === 'PLAYING') {
+} else if (room.phase === 'PLAYING') {
 let validCards = activeSeat.hand.filter(c => isValidMove(activeSeat.hand, c, room.trickCards, room.trumpSuit));
 let chosen = validCards.at(0);
 if (room.trickCards.length === 0) {
@@ -555,7 +618,6 @@ room.roundStarterIndex = (room.roundStarterIndex + 1) % 3;
 room.statusText = infoMsg;
 broadcastState(roomCode);
 });
-// 3 devynakių spėjimo pradžia
 socket.on('startNineGuess', ({ roomCode, suit }) => {
 const room = rooms[roomCode];
 if (!room) return;
@@ -576,7 +638,6 @@ guesses: {}
 room.phase = 'NINE_GUESS';
 room.statusText = '🔮 ' + giver.name + ' turi TRIS DEVYNAKES ir siūlo atspėti vienos iš jų rūšį! Kiti žaidėjai renkasi...';
 broadcastState(roomCode);
-// Jei kiti žaidėjai yra botai, jie atspėja automatiškai
 room.seats.forEach((s, idx) => {
 if (idx !== seatIdx && s.isBot) {
 const randomSuit = suits.at(Math.floor(Math.random() * suits.length));
@@ -588,7 +649,6 @@ if (otherHumans.length === 0) {
 setTimeout(() => evaluateNineGuess(roomCode), 1500);
 }
 });
-// Kito žaidėjo spėjimas
 socket.on('submitNineGuess', ({ roomCode, suit }) => {
 const room = rooms[roomCode];
 if (!room || room.phase !== 'NINE_GUESS' || !room.nineGuess) return;

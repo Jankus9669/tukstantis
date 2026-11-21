@@ -519,4 +519,56 @@ div.innerHTML = '' + avatar + ' ' + sender + ':' + text + '';
 box.appendChild(div);
 box.scrollTop = box.scrollHeight;
 });
+// --- PERGALĖS KONFETI IR SUDEGIMO ANIMACIJOS ---
+const animStyle = document.createElement('style');
+animStyle.innerHTML = `
+@keyframes screenShake {
+    0%, 100% { transform: translateX(0); }
+    15%, 45%, 75% { transform: translateX(-8px); }
+    30%, 60%, 90% { transform: translateX(8px); }
+}
+.burn-effect {
+    animation: screenShake 0.45s ease-in-out;
+    box-shadow: inset 0 0 90px rgba(239, 68, 68, 0.85) !important;
+}
+`;
+document.head.appendChild(animStyle);
+
+function triggerBurnAnimation() {
+    document.body.classList.remove('burn-effect');
+    void document.body.offsetWidth;
+    document.body.classList.add('burn-effect');
+    if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+    setTimeout(() => document.body.classList.remove('burn-effect'), 700);
+}
+
+function triggerConfettiAnimation() {
+    const colors = ['#fbbf24', '#10b981', '#ef4444', '#3b82f6', '#ec4899', '#a855f7'];
+    for (let i = 0; i < 110; i++) {
+        const conf = document.createElement('div');
+        const size = Math.random() * 8 + 6;
+        conf.style.cssText = 'position:fixed; top:-15px; left:' + (Math.random() * 100) + 'vw; width:' + size + 'px; height:' + (size * 1.4) + 'px; background:' + colors[Math.floor(Math.random() * colors.length)] + '; z-index:9999; pointer-events:none; border-radius:2px;';
+        document.body.appendChild(conf);
+
+        const duration = Math.random() * 2000 + 2200;
+        const drift = (Math.random() - 0.5) * 200;
+        const rot = Math.random() * 720 + 360;
+
+        conf.animate([
+            { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+            { transform: 'translate(' + drift + 'px, 105vh) rotate(' + rot + 'deg)', opacity: 0.2 }
+        ], { duration: duration, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' });
+
+        setTimeout(() => conf.remove(), duration);
+    }
+}
+
+socket.on('gameState', (state) => {
+    if (state.statusText && state.statusText.includes('SUDEGĖ') && (!lastState || lastState.statusText !== state.statusText)) {
+        triggerBurnAnimation();
+    }
+    if (state.phase === 'GAME_OVER' && (!lastState || lastState.phase !== 'GAME_OVER')) {
+        triggerConfettiAnimation();
+    }
+});
 // PABAIGA

@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tūkstantis (1000) - Online Klubas</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/icon.svg">
+    <meta name="theme-color" content="#064e3b">
+
     <style>
         * { box-sizing: border-box; }
         body {
@@ -573,6 +577,12 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
+
 </body>
 </html>
 

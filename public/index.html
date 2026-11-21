@@ -364,6 +364,79 @@
             .side-column { width: 100%; max-width: 500px; }
             .side-panel { width: 100%; padding: 10px; }
         }
+        /* --- PRABANGAUS STALO DEKORACIJOS --- */
+        .poker-table {
+            background: 
+                radial-gradient(circle at 50% 45%, rgba(251, 191, 36, 0.14) 0%, transparent 55%),
+                repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 6px),
+                radial-gradient(ellipse at center, #15803d 0%, #064e3b 70%, #022c22 100%) !important;
+            border: 16px solid #3b1706 !important;
+            box-shadow: 
+                inset 0 0 70px rgba(0, 0, 0, 0.85),
+                0 20px 50px rgba(0, 0, 0, 0.9),
+                0 0 0 3px #d97706,
+                0 0 0 7px #1e0b03 !important;
+        }
+        .poker-table::before {
+            border: 2px dashed rgba(251, 191, 36, 0.45) !important;
+            box-shadow: inset 0 0 20px rgba(251, 191, 36, 0.12);
+        }
+        .table-watermark {
+            width: 210px;
+            height: 210px;
+            border-radius: 50%;
+            border: 3px solid rgba(251, 191, 36, 0.18);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 62px !important;
+            color: rgba(251, 191, 36, 0.15) !important;
+            box-shadow: inset 0 0 25px rgba(251, 191, 36, 0.08);
+        }
+        .watermark-suits {
+            font-size: 20px;
+            letter-spacing: 10px;
+            margin-top: -6px;
+            color: rgba(251, 191, 36, 0.25);
+        }
+        /* Dekoratyviniai žetonai ir kortų kaladė */
+        .table-decor-left, .table-decor-right {
+            position: absolute;
+            top: 22px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 1;
+            pointer-events: none;
+        }
+        .table-decor-left { left: 26%; }
+        .table-decor-right { right: 26%; }
+        .chip {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 3px dashed #ffffff;
+            box-shadow: 0 4px 0 #111827, 0 6px 8px rgba(0,0,0,0.6);
+        }
+        .chip.red { background: #dc2626; }
+        .chip.blue { background: #2563eb; }
+        .chip.gold { background: #d97706; }
+        .deck-stack {
+            width: 34px;
+            height: 48px;
+            background: repeating-linear-gradient(45deg, #1e3a8a, #1e3a8a 5px, #312e81 5px, #312e81 10px);
+            border: 2px solid #f8fafc;
+            border-radius: 5px;
+            box-shadow: 2px 2px 0 #cbd5e1, 4px 4px 0 #94a3b8, 0 6px 10px rgba(0,0,0,0.7);
+            transform: rotate(-12deg);
+        }
+        @media (max-width: 768px) {
+            .table-decor-left { left: 14%; top: 14px; transform: scale(0.75); }
+            .table-decor-right { right: 14%; top: 14px; transform: scale(0.75); }
+            .table-watermark { width: 150px; height: 150px; font-size: 44px !important; }
+        }
+
     </style>
 </head>
 <body>
@@ -399,7 +472,21 @@
 
         <div class="game-layout">
             <div class="poker-table">
-                <div class="table-watermark">1000</div>
+                            <div class="table-watermark">
+                <div>1000</div>
+                <div class="watermark-suits">♠ ♥ ♦ ♣</div>
+            </div>
+
+            <div class="table-decor-left">
+                <div class="deck-stack"></div>
+                <div class="chip red"></div>
+            </div>
+
+            <div class="table-decor-right">
+                <div class="chip gold"></div>
+                <div class="chip blue"></div>
+            </div>
+
 
                 <div class="dealer-seat">
                     <span style="font-size: 24px;">🤵</span>

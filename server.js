@@ -40,6 +40,18 @@ function getMarriageBonus(suit) {
     return 40;
 }
 
+function addBonusWithBarrelRule(seat, bonus) {
+    if (seat.totalScore >= 900) {
+        return seat.name + ' sėdi ant statinės (900). ';
+    } else if (seat.totalScore + bonus >= 900) {
+        seat.totalScore = 900;
+        return seat.name + ' pasiekė statinę (900)! ';
+    } else {
+        seat.totalScore += bonus;
+        return seat.name + ' gauna +' + bonus + ' tšk.! ';
+    }
+}
+
 function createDeck() {
     let rawDeck = [];
     for (let s of suits) {
@@ -100,8 +112,17 @@ function broadcastState(roomCode) {
                 bidStatus: s.bidStatus,
                 cardsRevealed: s.cardsRevealed,
                 isBlind: s.isBlind,
-                usedPlus: !!s.usedPlus
+                usedPlus: !!s.usedPlus,
+                usedNineGuess: !!s.usedNineGuess
             }));
+
+            let guessInfo = null;
+            if (room.nineGuess) {
+                guessInfo = {
+                    giverIndex: room.nineGuess.giverIndex,
+                    hasGuessed: !!room.nineGuess.guesses[seatIdx]
+                };
+            }
 
             io.to(seat.socketId).emit('gameState', {
                 roomCode: room.code,
@@ -110,6 +131,8 @@ function broadcastState(roomCode) {
                 myCardsRevealed: seat.cardsRevealed,
                 myIsBlind: seat.isBlind,
                 myUsedPlus: !!seat.usedPlus,
+                myUsedNineGuess: !!seat.usedNineGuess,
+                nineGuess: guessInfo,
                 seats: publicSeats,
                 phase: room.phase,
                 statusText: room.statusText,
@@ -140,6 +163,7 @@ function startRound(roomCode) {
         seat.isBlind = false;
         seat.passed = false;
         seat.bidStatus = '-';
+        seat.usedNineGuess = false;
         if (seat.isBot) {
             seat.maxBid = evaluateBotHand(seat.hand, seat.totalScore);
         }
@@ -150,6 +174,7 @@ function startRound(roomCode) {
     room.discardedPile = [];
     room.trumpSuit = null;
     room.trickCards = [];
+    room.nineGuess = null;
     room.currentBid = 100;
     room.minBidAfterWin = 100;
     room.highestBidderIndex = room.roundStarterIndex;
@@ -173,7 +198,7 @@ function startRound(roomCode) {
 
 function advanceBidding(roomCode) {
     const room = rooms[roomCode];
-    if (!room) return;
+    if (!room || room.phase !== 'BIDDING') return;
 
     const activeCount = room.seats.filter(s => !s.passed).length;
     if (activeCount <= 1) {
@@ -234,6 +259,45 @@ function finishBidding(roomCode) {
             broadcastState(roomCode);
         }
     }, 2000);
+}
+
+function evaluateNineGuess(roomCode) {
+    const room = rooms[roomCode];
+    if (!room || !room.nineGuess) return;
+
+    const ng = room.nineGuess;
+    const giver = room.seats[ng.giverIndex];
+    const targetSuit = ng.targetSuit;
+    const bonus = getMarriageBonus(targetSuit);
+
+    const correctGuessers = [];
+    room.seats.forEach((s, idx) => {
+        if (idx !== ng.giverIndex && ng.guesses[idx] === targetSuit) {
+            correctGuessers.push(s);
+        }
+    });
+
+    let msg = '🔮 ' + giver.name + ' buvo paslėpęs 9' + targetSuit + ' (' + bonus + ' tšk.)! ';
+
+    if (correctGuessers.length === 1) {
+        msg += 'Atspėjo tik ' + correctGuessers.at(0).name + '! ' + addBonusWithBarrelRule(correctGuessers.at(0), bonus);
+    } else if (correctGuessers.length === 2) {
+        const half = bonus / 2;
+        msg += 'Atspėjo ABUDU (' + correctGuessers.at(0).name + ' ir ' + correctGuessers.at(1).name + '), todėl taškai dalinami per pusę (po +' + half + ' tšk.)! ';
+        msg += addBonusWithBarrelRule(correctGuessers.at(0), half);
+        msg += addBonusWithBarrelRule(correctGuessers.at(1), half);
+    } else {
+        msg += 'Neatspėjo NĖ VIENAS! Visus taškus pasiima ' + giver.name + '! ' + addBonusWithBarrelRule(giver, bonus);
+    }
+
+    room.phase = ng.prevPhase;
+    room.nineGuess = null;
+    room.statusText = msg;
+    broadcastState(roomCode);
+
+    if (room.phase === 'BIDDING' || room.phase === 'PLAYING') {
+        checkBotAction(roomCode);
+    }
 }
 
 function evaluateTrick(roomCode) {
@@ -326,11 +390,12 @@ function finishRound(roomCode) {
 function checkBotAction(roomCode) {
     const room = rooms[roomCode];
     if (!room) return;
+    if (room.phase === 'NINE_GUESS') return;
     const activeSeat = room.seats[room.currentTurnIndex];
     if (!activeSeat || !activeSeat.isBot) return;
 
     setTimeout(() => {
-        if (!rooms[roomCode] || room.phase === 'ROUND_OVER' || room.phase === 'GAME_OVER') return;
+        if (!rooms[roomCode] || room.phase === 'ROUND_OVER' || room.phase === 'GAME_OVER' || room.phase === 'NINE_GUESS') return;
         if (room.phase === 'BIDDING') {
             if (room.currentBid + 10 <= activeSeat.maxBid) {
                 room.currentBid += 10;
@@ -344,43 +409,39 @@ function checkBotAction(roomCode) {
             }
             advanceBidding(roomCode);
         } else if (room.phase === 'PLAYING') {
-            let validCards = activeSeat.hand.filter(c => isValidMove(activeSeat.hand, c, room.trickCards, room.trumpSuit));
-            let chosen = validCards.at(0);
-            if (room.trickCards.length === 0) {
-                let marriage = validCards.find(c => (c.name === 'Q' || c.name === 'K') && activeSeat.hand.some(p => p.suit === c.suit && p.name === (c.name === 'Q' ? 'K' : 'Q')));
-                if (marriage) chosen = marriage;
-                else {
-                    validCards.sort((a, b) => b.power - a.power);
-                    chosen = validCards.at(0);
-                }
-            } else {
-                validCards.sort((a, b) => a.power - b.power);
-                chosen = validCards.at(0);
-            }
-            let idx = activeSeat.hand.indexOf(chosen);
-            activeSeat.hand.splice(idx, 1);
-            executePlayCard(roomCode, room.currentTurnIndex, chosen);
-        }
-    }, 900);
+let validCards = activeSeat.hand.filter(c => isValidMove(activeSeat.hand, c, room.trickCards, room.trumpSuit));
+let chosen = validCards.at(0);
+if (room.trickCards.length === 0) {
+let marriage = validCards.find(c => (c.name === 'Q' || c.name === 'K') && activeSeat.hand.some(p => p.suit === c.suit && p.name === (c.name === 'Q' ? 'K' : 'Q')));
+if (marriage) chosen = marriage;
+else {
+validCards.sort((a, b) => b.power - a.power);
+chosen = validCards.at(0);
 }
-
+} else {
+validCards.sort((a, b) => a.power - b.power);
+chosen = validCards.at(0);
+}
+let idx = activeSeat.hand.indexOf(chosen);
+activeSeat.hand.splice(idx, 1);
+executePlayCard(roomCode, room.currentTurnIndex, chosen);
+}
+}, 900);
+}
 function executePlayCard(roomCode, seatIdx, card) {
-    const room = rooms[roomCode];
-    const seat = room.seats[seatIdx];
-
-    if (room.trickCards.length === 0 && (card.name === 'Q' || card.name === 'K')) {
-        let partner = card.name === 'Q' ? 'K' : 'Q';
-        if (seat.hand.some(c => c.suit === card.suit && c.name === partner)) {
-            room.trumpSuit = card.suit;
-            let bonus = getMarriageBonus(card.suit);
-            seat.roundScore += bonus;
-            room.statusText = '👑 ' + seat.name + ' skelbia PORĄ (' + card.suit + ') +' + bonus + ' tšk.! Koziris: ' + room.trumpSuit;
-        }
-    }
-
-    room.trickCards.push({ seatIndex: seatIdx, card: card });
-    broadcastState(roomCode);
-
+const room = rooms[roomCode];
+const seat = room.seats[seatIdx];
+if (room.trickCards.length === 0 && (card.name === 'Q' || card.name === 'K')) {
+let partner = card.name === 'Q' ? 'K' : 'Q';
+if (seat.hand.some(c => c.suit === card.suit && c.name === partner)) {
+room.trumpSuit = card.suit;
+let bonus = getMarriageBonus(card.suit);
+seat.roundScore += bonus;
+room.statusText = '👑 ' + seat.name + ' skelbia PORĄ (' + card.suit + ') +' + bonus + ' tšk.! Koziris: ' + room.trumpSuit;
+}
+}
+room.trickCards.push({ seatIndex: seatIdx, card: card });
+broadcastState(roomCode);
 if (room.trickCards.length === 3) {
 evaluateTrick(roomCode);
 } else {
@@ -460,7 +521,7 @@ const room = rooms[roomCode];
 if (!room) return;
 room.seats.forEach(s => {
 s.totalScore = 0;
-s.usedPlus = false; // Naujame žaidime pagalba vėl atsinaujina
+s.usedPlus = false;
 });
 room.roundStarterIndex = 0;
 startRound(roomCode);
@@ -468,7 +529,6 @@ startRound(roomCode);
 socket.on('nextRound', (roomCode) => {
 startRound(roomCode);
 });
-// Pagalba: Duoti pliusą (1 kartą per žaidimą, kitiems po +60 taškų)
 socket.on('givePlus', (roomCode) => {
 const room = rooms[roomCode];
 if (!room) return;
@@ -489,19 +549,61 @@ room.seats.forEach(s => s.cardsRevealed = true);
 let infoMsg = '➕ ' + giver.name + ' pasinaudojo vienkartine pagalba „DUOTI PLIUSĄ“! Likusiems žaidėjams pridedama po +60 taškų. ';
 room.seats.forEach((s, idx) => {
 if (idx !== seatIdx) {
-if (s.totalScore >= 900) {
-infoMsg += s.name + ' sėdi ant statinės (900). ';
-} else if (s.totalScore + 60 >= 900) {
-s.totalScore = 900;
-infoMsg += s.name + ' pasiekė statinę (900)! ';
-} else {
-s.totalScore += 60;
-}
+infoMsg += addBonusWithBarrelRule(s, 60);
 }
 });
 room.roundStarterIndex = (room.roundStarterIndex + 1) % 3;
 room.statusText = infoMsg;
 broadcastState(roomCode);
+});
+// 3 devynakių spėjimo pradžia
+socket.on('startNineGuess', ({ roomCode, suit }) => {
+const room = rooms[roomCode];
+if (!room) return;
+if (room.phase !== 'BIDDING' && room.phase !== 'DISCARD_3' && room.phase !== 'RAISE_BID') return;
+const seatIdx = room.seats.findIndex(s => s.socketId === socket.id);
+if (seatIdx === -1) return;
+const giver = room.seats[seatIdx];
+const nines = giver.hand.filter(c => c.name === '9');
+if (nines.length !== 3 || giver.usedNineGuess) return;
+if (!nines.some(c => c.suit === suit)) return;
+giver.usedNineGuess = true;
+room.nineGuess = {
+giverIndex: seatIdx,
+targetSuit: suit,
+prevPhase: room.phase,
+guesses: {}
+};
+room.phase = 'NINE_GUESS';
+room.statusText = '🔮 ' + giver.name + ' turi TRIS DEVYNAKES ir siūlo atspėti vienos iš jų rūšį! Kiti žaidėjai renkasi...';
+broadcastState(roomCode);
+// Jei kiti žaidėjai yra botai, jie atspėja automatiškai
+room.seats.forEach((s, idx) => {
+if (idx !== seatIdx && s.isBot) {
+const randomSuit = suits.at(Math.floor(Math.random() * suits.length));
+room.nineGuess.guesses[idx] = randomSuit;
+}
+});
+const otherHumans = room.seats.filter((s, idx) => idx !== seatIdx && !s.isBot);
+if (otherHumans.length === 0) {
+setTimeout(() => evaluateNineGuess(roomCode), 1500);
+}
+});
+// Kito žaidėjo spėjimas
+socket.on('submitNineGuess', ({ roomCode, suit }) => {
+const room = rooms[roomCode];
+if (!room || room.phase !== 'NINE_GUESS' || !room.nineGuess) return;
+const seatIdx = room.seats.findIndex(s => s.socketId === socket.id);
+if (seatIdx === -1 || seatIdx === room.nineGuess.giverIndex) return;
+if (room.nineGuess.guesses[seatIdx]) return;
+room.nineGuess.guesses[seatIdx] = suit;
+const totalOthers = room.seats.filter((_, idx) => idx !== room.nineGuess.giverIndex).length;
+const guessedCount = Object.keys(room.nineGuess.guesses).length;
+if (guessedCount >= totalOthers) {
+evaluateNineGuess(roomCode);
+} else {
+broadcastState(roomCode);
+}
 });
 socket.on('revealCards', (roomCode) => {
 const room = rooms[roomCode];

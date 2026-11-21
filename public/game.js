@@ -242,9 +242,42 @@ socket.on('gameState', (state) => {
     renderDiscarded(state);
 });
 
+let choosingNineToHide = false;
+
+function getSuitPointsLabel(suit) {
+    if (suit === '♣') return '100 tšk.';
+    if (suit === '♠') return '80 tšk.';
+    if (suit === '♥') return '60 tšk.';
+    return '40 tšk.';
+}
+
 function renderControls(state) {
     const area = document.getElementById('controlsArea');
     area.innerHTML = '';
+
+    // Jei vyksta 3 devynakių spėliojimo etapas
+    if (state.phase === 'NINE_GUESS' && state.nineGuess) {
+        choosingNineToHide = false;
+        if (state.nineGuess.giverIndex === state.mySeatIndex) {
+            const info = document.createElement('div');
+            info.style.cssText = 'color:#fde68a; font-weight:bold; padding:8px;';
+            info.innerText = '⏳ Laukiame, kol kiti žaidėjai atspės tavo paslėptą devynakę...';
+            area.appendChild(info);
+        } else if (state.nineGuess.hasGuessed) {
+            const info = document.createElement('div');
+            info.style.cssText = 'color:#10b981; font-weight:bold; padding:8px;';
+            info.innerText = '✅ Tavo spėjimas užfiksuotas! Laukiame kito žaidėjo...';
+            area.appendChild(info);
+        } else {
+            ['♣', '♠', '♥', '♦'].forEach(s => {
+                addButton('Spėju: 9' + s + ' (' + getSuitPointsLabel(s) + ')', '', () => {
+                    playSound('bid');
+                    socket.emit('submitNineGuess', { roomCode: currentRoomCode, suit: s });
+                });
+            });
+        }
+        return;
+    }
 
     const isMyTurn = (state.currentTurnIndex === state.mySeatIndex);
     const amIHighestBidder = (state.highestBidderIndex === state.mySeatIndex);
@@ -292,6 +325,35 @@ function renderControls(state) {
         addButton('Žaisti naują žaidimą 🔄', 'success', () => socket.emit('startGame', currentRoomCode));
     }
 
+    // 3 devynakių spėjimo pasiūlymas
+    const myNines = (state.myHand || []).filter(c => c.name === '9');
+    const canOfferNineGuess = state.myCardsRevealed && myNines.length === 3 && !state.myUsedNineGuess && (
+        state.phase === 'BIDDING' ||
+        ((state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID') && amIHighestBidder)
+    );
+
+    if (canOfferNineGuess) {
+        if (!choosingNineToHide) {
+            addButton('🔮 Duoti spėti 9-akę (turi 3 devynakes)', '', () => {
+                choosingNineToHide = true;
+                renderControls(lastState);
+            });
+        } else {
+            myNines.forEach(c => {
+                addButton('Paslėpti: 9' + c.suit + ' (' + getSuitPointsLabel(c.suit) + ')', 'success', () => {
+                    choosingNineToHide = false;
+                    playSound('marriage');
+                    socket.emit('startNineGuess', { roomCode: currentRoomCode, suit: c.suit });
+                });
+            });
+            addButton('Atšaukti', 'danger', () => {
+                choosingNineToHide = false;
+                renderControls(lastState);
+            });
+        }
+    }
+
+    // Vienkartinė pagalba „Duoti pliusą“
     const canGivePlus = !state.myUsedPlus && (
         state.phase === 'BIDDING' ||
         ((state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID') && amIHighestBidder)
@@ -305,6 +367,7 @@ function renderControls(state) {
         });
     }
 }
+
 
 function renderTableCenter(state) {
     const title = document.getElementById('centerTitle');

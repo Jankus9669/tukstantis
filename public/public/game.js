@@ -374,18 +374,53 @@ function renderControls(state) {
         if (!amIHighestBidder || state.currentBid > 100) {
             addButton('Pasuoti', 'danger', () => { playSound('bid'); socket.emit('passBid', currentRoomCode); });
         }
-    } else if (state.phase === 'RAISE_BID' && amIHighestBidder) {
-        if (state.currentBid - 20 >= state.minBidAfterWin) addButton('📉 -20 (' + (state.currentBid - 20) + ')', 'danger', () => socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: -20 }));
-        if (state.currentBid - 10 >= state.minBidAfterWin) addButton('🔽 -10 (' + (state.currentBid - 10) + ')', 'danger', () => socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: -10 }));
-        addButton('✅ Pradėti žaidimą su ' + state.currentBid, 'success', () => { playSound('bid'); socket.emit('confirmBidAndPlay', currentRoomCode); });
-        if (state.currentBid + 10 <= 300) addButton('📈 +10 (' + (state.currentBid + 10) + ')', '', () => socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: 10 }));
-        if (state.currentBid + 20 <= 300) addButton('🔥 +20 (' + (state.currentBid + 20) + ')', '', () => socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: 20 }));
-        if (state.currentBid + 50 <= 300) addButton('🚀 +50 (' + (state.currentBid + 50) + ')', '', () => socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: 50 }));
-    } else if (state.phase === 'ROUND_OVER' && state.mySeatIndex === 0) {
-        addButton('Dalinti kitą partiją ➡️', 'success', () => socket.emit('nextRound', currentRoomCode));
-    } else if (state.phase === 'GAME_OVER' && state.mySeatIndex === 0) {
-        addButton('Žaisti naują žaidimą 🔄', 'success', () => socket.emit('startGame', currentRoomCode));
+        } else if (state.phase === 'RAISE_BID' && amIHighestBidder) {
+        const stepper = document.createElement('div');
+        stepper.style.cssText = 'display:inline-flex; align-items:center; gap:8px; background:rgba(15,23,42,0.85); padding:6px 10px; border-radius:12px; border:1px solid #fbbf24;';
+
+        const minusBtn = document.createElement('button');
+        minusBtn.innerText = '➖ -100';
+        minusBtn.className = 'danger';
+        minusBtn.disabled = (state.currentBid - 100 < state.minBidAfterWin);
+        minusBtn.style.opacity = minusBtn.disabled ? '0.4' : '1';
+        minusBtn.addEventListener('click', () => {
+            playSound('bid');
+            socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: -100 });
+        });
+
+        const valLabel = document.createElement('span');
+        valLabel.innerText = state.currentBid;
+        valLabel.style.cssText = 'font-size:20px; font-weight:900; color:#fbbf24; min-width:48px; text-align:center;';
+
+        const plusBtn = document.createElement('button');
+        plusBtn.innerText = '➕ +100';
+        plusBtn.disabled = (state.currentBid + 100 > 400);
+        plusBtn.style.opacity = plusBtn.disabled ? '0.4' : '1';
+        plusBtn.addEventListener('click', () => {
+            playSound('bid');
+            socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: 100 });
+        });
+
+        stepper.appendChild(minusBtn);
+        stepper.appendChild(valLabel);
+        stepper.appendChild(plusBtn);
+        area.appendChild(stepper);
+
+        addButton('✅ Pradėti žaidimą su ' + state.currentBid, 'success', () => {
+            playSound('bid');
+            socket.emit('confirmBidAndPlay', currentRoomCode);
+        });
+
+    } else if (state.phase === 'ROUND_OVER') {
+        if (state.mySeatIndex === 0) {
+            addButton('Dalinti kitą partiją ➡️', 'success', () => socket.emit('nextRound', currentRoomCode));
+        }
+    } else if (state.phase === 'GAME_OVER') {
+        if (state.mySeatIndex === 0) {
+            addButton('Žaisti naują žaidimą 🔄', 'success', () => socket.emit('startGame', currentRoomCode));
+        }
     }
+
 
     const myNines = (state.myHand || []).filter(c => c.name === '9');
     const canOfferNineGuess = state.myCardsRevealed && myNines.length === 3 && !state.myUsedNineGuess && (state.phase === 'BIDDING' || ((state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID') && amIHighestBidder));

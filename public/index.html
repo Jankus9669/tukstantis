@@ -440,6 +440,81 @@
             .table-decor-right { right: 14%; top: 14px; transform: scale(0.75); }
             .table-watermark { width: 150px; height: 150px; font-size: 44px !important; }
         }
+        /* --- 3D VIZUALIZACIJA IR PERSPEKTYVA --- */
+        .game-layout {
+            perspective: 1100px;
+        }
+        .poker-table {
+            transform: rotateX(14deg);
+            transform-style: preserve-3d;
+            border-bottom-width: 24px !important;
+            box-shadow: 
+                inset 0 0 75px rgba(0, 0, 0, 0.85),
+                0 28px 45px rgba(0, 0, 0, 0.9),
+                0 10px 0 #260e03,
+                0 14px 0 #d97706,
+                0 18px 0 #1a0902 !important;
+            transition: transform 0.4s ease;
+        }
+        .dealer-seat {
+            transform: translateZ(20px);
+            box-shadow: 0 10px 18px rgba(0,0,0,0.75) !important;
+        }
+        .player-box {
+            transform: translateZ(15px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.65) !important;
+        }
+        .player-box.active-turn {
+            transform: translateZ(25px) scale(1.04) !important;
+        }
+        /* 3D kortos ir vėduoklės efektas */
+        .card {
+            transform-style: preserve-3d;
+            border-bottom: 4px solid #cbd5e1 !important;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.55) !important;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s !important;
+        }
+        #playerCards .card:nth-child(1) { transform: rotate(-6deg) translateY(4px); }
+        #playerCards .card:nth-child(2) { transform: rotate(-4deg) translateY(2px); }
+        #playerCards .card:nth-child(3) { transform: rotate(-2deg) translateY(1px); }
+        #playerCards .card:nth-child(5) { transform: rotate(2deg) translateY(1px); }
+        #playerCards .card:nth-child(6) { transform: rotate(4deg) translateY(2px); }
+        #playerCards .card:nth-child(7) { transform: rotate(6deg) translateY(4px); }
+
+        #playerCards .card.clickable:hover, 
+        #playerCards .card.clickable:active {
+            transform: translateY(-18px) scale(1.12) rotate(0deg) !important;
+            box-shadow: 0 18px 25px rgba(251, 191, 36, 0.85) !important;
+            z-index: 20;
+        }
+        /* Animacija, kai korta nusileidžia ant stalo */
+        @keyframes cardDrop3D {
+            0% {
+                opacity: 0;
+                transform: translateY(-60px) scale(1.35) rotateX(45deg);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1) rotateX(0deg);
+            }
+        }
+        #tableCards .card {
+            animation: cardDrop3D 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .chip {
+            transform: translateZ(12px);
+            box-shadow: 0 5px 0 #0f172a, 0 8px 12px rgba(0,0,0,0.8) !important;
+        }
+        .deck-stack {
+            transform: rotate(-12deg) translateZ(12px) !important;
+            box-shadow: 2px 3px 0 #cbd5e1, 4px 6px 0 #94a3b8, 6px 9px 0 #64748b, 0 12px 16px rgba(0,0,0,0.85) !important;
+        }
+        @media (max-width: 768px) {
+            .poker-table {
+                transform: rotateX(9deg);
+                border-bottom-width: 14px !important;
+            }
+        }
 
     </style>
 </head>

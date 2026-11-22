@@ -10,6 +10,7 @@ let selectedAvatar = '👨';
 let currentRoomCode = sessionStorage.getItem('tukstantis_room') || null;
 let lastState = null;
 let soundEnabled = true;
+let choosingNineToHide = false;
 
 socket.on('connect', () => {
     if (currentRoomCode) {
@@ -127,6 +128,92 @@ if (roomBannerEl) {
     roomBannerEl.appendChild(soundBtn);
 }
 
+const extraStyle = document.createElement('style');
+extraStyle.innerHTML = `
+@keyframes screenShake {
+    0%, 100% { transform: translateX(0); }
+    15%, 45%, 75% { transform: translateX(-8px); }
+    30%, 60%, 90% { transform: translateX(8px); }
+}
+.burn-effect {
+    animation: screenShake 0.45s ease-in-out;
+    box-shadow: inset 0 0 90px rgba(239, 68, 68, 0.85) !important;
+}
+@keyframes goldShimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+.card.hidden::after {
+    background-image: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.65) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: goldShimmer 3.2s infinite linear;
+}
+.poker-table.blind-aura {
+    box-shadow: inset 0 0 80px rgba(168, 85, 247, 0.55), 0 0 35px rgba(168, 85, 247, 0.7) !important;
+    border-color: #7e22ce !important;
+}
+.poker-table.marriage-aura {
+    box-shadow: inset 0 0 90px rgba(251, 191, 36, 0.75), 0 0 45px rgba(251, 191, 36, 0.9) !important;
+}
+@keyframes barrelPulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(249, 115, 22, 0.6); }
+    50% { box-shadow: 0 0 26px rgba(239, 68, 68, 1); }
+}
+.on-barrel {
+    animation: barrelPulse 1.6s infinite ease-in-out;
+    border-color: #f97316 !important;
+}
+.trick-fly-me { transform: translate(0, 140px) scale(0.2) rotate(25deg) !important; opacity: 0 !important; transition: all 0.55s ease-in !important; }
+.trick-fly-left { transform: translate(-180px, -110px) scale(0.2) rotate(-35deg) !important; opacity: 0 !important; transition: all 0.55s ease-in !important; }
+.trick-fly-right { transform: translate(180px, -110px) scale(0.2) rotate(35deg) !important; opacity: 0 !important; transition: all 0.55s ease-in !important; }
+`;
+document.head.appendChild(extraStyle);
+
+function triggerBurnAnimation() {
+    document.body.classList.remove('burn-effect');
+    void document.body.offsetWidth;
+    document.body.classList.add('burn-effect');
+    if (navigator.vibrate) navigator.vibrate();
+    setTimeout(() => document.body.classList.remove('burn-effect'), 700);
+}
+
+function triggerConfettiAnimation() {
+    const colors = ['#fbbf24', '#10b981', '#ef4444', '#3b82f6', '#ec4899', '#a855f7'];
+    for (let i = 0; i < 110; i++) {
+        const conf = document.createElement('div');
+        const size = Math.random() * 8 + 6;
+        conf.style.cssText = 'position:fixed; top:-15px; left:' + (Math.random() * 100) + 'vw; width:' + size + 'px; height:' + (size * 1.4) + 'px; background:' + colors[Math.floor(Math.random() * colors.length)] + '; z-index:9999; pointer-events:none; border-radius:2px;';
+        document.body.appendChild(conf);
+
+        const duration = Math.random() * 2000 + 2200;
+        const drift = (Math.random() - 0.5) * 200;
+        const rot = Math.random() * 720 + 360;
+
+        conf.animate([
+            { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+            { transform: 'translate(' + drift + 'px, 105vh) rotate(' + rot + 'deg)', opacity: 0.2 }
+        ], { duration: duration, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' });
+
+        setTimeout(() => conf.remove(), duration);
+    }
+}
+
+document.addEventListener('mousemove', (e) => {
+    const table = document.querySelector('.poker-table');
+    if (!table || window.innerWidth <= 768) return;
+    const xAxis = (window.innerWidth / 2 - e.pageX) / 65;
+    const yAxis = (window.innerHeight / 2 - e.pageY) / 65;
+    table.style.transform = 'rotateX(' + (14 + yAxis) + 'deg) rotateY(' + (-xAxis) + 'deg)';
+});
+
+window.addEventListener('deviceorientation', (e) => {
+    const table = document.querySelector('.poker-table');
+    if (!table || !e.gamma || !e.beta) return;
+    const tiltX = Math.max(-8, Math.min(8, e.gamma / 5));
+    const tiltY = Math.max(-5, Math.min(5, (e.beta - 45) / 8));
+    table.style.transform = 'rotateX(' + (10 + tiltY) + 'deg) rotateY(' + tiltX + 'deg)';
+});
+
 document.getElementById('lobbyMale').addEventListener('click', () => {
     initAudio();
     selectedAvatar = '👨';
@@ -148,32 +235,35 @@ document.getElementById('createRoomBtn').addEventListener('click', () => {
 });
 
 document.getElementById('joinRoomBtn').addEventListener('click', () => {
-    initAudio();
-    const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
-    const code = document.getElementById('roomCodeInput').value.trim();
-    if (!code) {
-        alert('Įrašyk kambario kodą!');
-        return;
-    }
-    socket.emit('joinRoom', { roomCode: code, playerName: name, avatar: selectedAvatar, playerToken: playerToken });
+initAudio();
+const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
+const code = document.getElementById('roomCodeInput').value.trim();
+if (!code) {
+alert('Įrašyk kambario kodą!');
+return;
+}
+socket.emit('joinRoom', { roomCode: code, playerName: name, avatar: selectedAvatar, playerToken: playerToken });
 });
-
 socket.on('errorMsg', (msg) => {
-    alert(msg);
+alert(msg);
 });
-
 function addButton(text, className, onClickFn) {
-    const btn = document.createElement('button');
-    btn.innerText = text;
-    if (className) btn.className = className;
-    btn.addEventListener('click', onClickFn);
-    document.getElementById('controlsArea').appendChild(btn);
+const btn = document.createElement('button');
+btn.innerText = text;
+if (className) btn.className = className;
+btn.addEventListener('click', onClickFn);
+document.getElementById('controlsArea').appendChild(btn);
 }
-
 function formatTotalScore(score) {
-    if (score >= 900 && score < 1000) return score + ' 🛢️ (Statinė)';
-    return score;
+if (score >= 900 && score < 1000) return score + ' 🛢️ (Statinė)';
+return score;
 }
+function getSuitPointsLabel(suit) {
+if (suit === '♣') return '100 tšk.';
+if (suit === '♠') return '80 tšk.';
+if (suit === '♥') return '60 tšk.';
+return '40 tšk.';
+}```javascript
 socket.on('gameState', (state) => {
     if (lastState) {
         if (state.trickCards.length > lastState.trickCards.length) {
@@ -188,6 +278,12 @@ socket.on('gameState', (state) => {
         }
         if ((state.phase === 'ROUND_OVER' || state.phase === 'GAME_OVER') && lastState.phase === 'PLAYING') {
             playSound('win');
+        }
+        if (state.statusText && state.statusText.includes('SUDEGĖ') && lastState.statusText !== state.statusText) {
+            triggerBurnAnimation();
+        }
+        if (state.phase === 'GAME_OVER' && lastState.phase !== 'GAME_OVER') {
+            triggerConfettiAnimation();
         }
     }
 
@@ -216,9 +312,14 @@ socket.on('gameState', (state) => {
     const left = state.seats.at(leftIdx);
     const right = state.seats.at(rightIdx);
 
+    const meBox = document.getElementById('box-me');
+    const leftBox = document.getElementById('box-left');
+    const rightBox = document.getElementById('box-right');
+
     document.getElementById('meAvatar').innerText = me.avatar;
     document.getElementById('meHeader').innerText = me.name + ' | Bendri: ' + formatTotalScore(me.totalScore) + ' / 1000 | Partijoje: ' + me.roundScore;
-    document.getElementById('box-me').classList.toggle('active-turn', state.currentTurnIndex === myIdx && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER');
+    meBox.classList.toggle('active-turn', state.currentTurnIndex === myIdx && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER');
+    meBox.classList.toggle('on-barrel', me.totalScore >= 900);
 
     document.getElementById('leftAvatar').innerText = left.avatar;
     document.getElementById('leftName').innerText = left.name;
@@ -226,7 +327,8 @@ socket.on('gameState', (state) => {
     document.getElementById('leftRound').innerText = left.roundScore;
     document.getElementById('leftCount').innerText = left.cardCount;
     document.getElementById('leftBid').innerText = left.bidStatus;
-    document.getElementById('box-left').classList.toggle('active-turn', state.currentTurnIndex === leftIdx && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER');
+    leftBox.classList.toggle('active-turn', state.currentTurnIndex === leftIdx && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER');
+    leftBox.classList.toggle('on-barrel', left.totalScore >= 900);
 
     document.getElementById('rightAvatar').innerText = right.avatar;
     document.getElementById('rightName').innerText = right.name;
@@ -234,28 +336,50 @@ socket.on('gameState', (state) => {
     document.getElementById('rightRound').innerText = right.roundScore;
     document.getElementById('rightCount').innerText = right.cardCount;
     document.getElementById('rightBid').innerText = right.bidStatus;
-    document.getElementById('box-right').classList.toggle('active-turn', state.currentTurnIndex === rightIdx && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER');
+    rightBox.classList.toggle('active-turn', state.currentTurnIndex === rightIdx && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER');
+    rightBox.classList.toggle('on-barrel', right.totalScore >= 900);
+
+    const table = document.querySelector('.poker-table');
+    if (table) {
+        const anyoneBlind = state.seats.some(s => s.isBlind) && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER';
+        table.classList.toggle('blind-aura', anyoneBlind);
+        if (state.statusText && state.statusText.includes('PORĄ')) {
+            table.classList.add('marriage-aura');
+            setTimeout(() => table.classList.remove('marriage-aura'), 2200);
+        }
+    }
+
+    const dealerEmoji = document.querySelector('.dealer-seat span');
+    const dealerSub = document.querySelector('.dealer-seat div span');
+    if (dealerEmoji && dealerSub && state.statusText) {
+        if (state.statusText.includes('SUDEGĖ')) {
+            dealerEmoji.innerText = '😱';
+            dealerSub.innerText = 'Oho, sudegė!';
+        } else if (state.statusText.includes('PORĄ')) {
+            dealerEmoji.innerText = '🥳';
+            dealerSub.innerText = 'Karališka pora!';
+        } else if (state.statusText.includes('AKLAI') || state.seats.some(s => s.isBlind)) {
+            dealerEmoji.innerText = '😎';
+            dealerSub.innerText = 'Drąsus ėjimas!';
+        } else if (state.phase === 'GAME_OVER') {
+            dealerEmoji.innerText = '🏆';
+            dealerSub.innerText = 'Sveikinimai!';
+        } else {
+            dealerEmoji.innerText = '🤵';
+            dealerSub.innerText = 'Prižiūri stalą';
+        }
+    }
 
     renderControls(state);
-    renderTableCenter(state);
+    renderTableCenter(state, leftIdx, rightIdx);
     renderMyCards(state);
     renderDiscarded(state);
 });
-
-let choosingNineToHide = false;
-
-function getSuitPointsLabel(suit) {
-    if (suit === '♣') return '100 tšk.';
-    if (suit === '♠') return '80 tšk.';
-    if (suit === '♥') return '60 tšk.';
-    return '40 tšk.';
-}
 
 function renderControls(state) {
     const area = document.getElementById('controlsArea');
     area.innerHTML = '';
 
-    // Jei vyksta 3 devynakių spėliojimo etapas
     if (state.phase === 'NINE_GUESS' && state.nineGuess) {
         choosingNineToHide = false;
         if (state.nineGuess.giverIndex === state.mySeatIndex) {
@@ -325,7 +449,6 @@ function renderControls(state) {
         addButton('Žaisti naują žaidimą 🔄', 'success', () => socket.emit('startGame', currentRoomCode));
     }
 
-    // 3 devynakių spėjimo pasiūlymas
     const myNines = (state.myHand || []).filter(c => c.name === '9');
     const canOfferNineGuess = state.myCardsRevealed && myNines.length === 3 && !state.myUsedNineGuess && (
         state.phase === 'BIDDING' ||
@@ -337,110 +460,106 @@ function renderControls(state) {
             addButton('🔮 Duoti spėti 9-akę (turi 3 devynakes)', '', () => {
                 choosingNineToHide = true;
                 renderControls(lastState);
-            });
-        } else {
-            myNines.forEach(c => {
-                addButton('Paslėpti: 9' + c.suit + ' (' + getSuitPointsLabel(c.suit) + ')', 'success', () => {
-                    choosingNineToHide = false;
-                    playSound('marriage');
-                    socket.emit('startNineGuess', { roomCode: currentRoomCode, suit: c.suit });
-                });
-            });
-            addButton('Atšaukti', 'danger', () => {
-                choosingNineToHide = false;
-                renderControls(lastState);
-            });
-        }
-    }
-
-    // Vienkartinė pagalba „Duoti pliusą“
-    const canGivePlus = !state.myUsedPlus && (
-        state.phase === 'BIDDING' ||
-        ((state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID') && amIHighestBidder)
-    );
-    if (canGivePlus) {
-        addButton('➕ Duoti pliusą (kitiems po +60 tšk.)', 'danger', () => {
-            if (confirm('Ar tikrai nori panaudoti savo vienkartinę pagalbą „Duoti pliusą“? Likusiems žaidėjams bus pridėta po +60 taškų.')) {
-                playSound('bid');
-                socket.emit('givePlus', currentRoomCode);
-            }
-        });
-    }
+            });} else {
+myNines.forEach(c => {
+addButton('Paslėpti: 9' + c.suit + ' (' + getSuitPointsLabel(c.suit) + ')', 'success', () => {
+choosingNineToHide = false;
+playSound('marriage');
+socket.emit('startNineGuess', { roomCode: currentRoomCode, suit: c.suit });
+});
+});
+addButton('Atšaukti', 'danger', () => {
+choosingNineToHide = false;
+renderControls(lastState);
+});
 }
-
-
-function renderTableCenter(state) {
-    const title = document.getElementById('centerTitle');
-    const container = document.getElementById('tableCards');
-    container.innerHTML = '';
-
-    if (state.phase === 'LOBBY') {
-        title.innerText = 'Laukia žaidėjų prisijungimo...';
-        return;
-    }
-
-    if (state.talonCount > 0) {
-        title.innerText = 'Bankas (3 kortos)';
-        if (state.talon.length > 0) {
-            state.talon.forEach(c => {
-                const div = document.createElement('div');
-                div.className = 'card ' + (c.isRed ? 'red' : '');
-                div.innerHTML = '<div>' + c.name + '</div><div>' + c.suit + '</div>';
-                container.appendChild(div);
-            });
-        } else {
-            for (let i = 0; i < state.talonCount; i++) {
-                const div = document.createElement('div');
-                div.className = 'card hidden';
-                container.appendChild(div);
-            }
-        }
-    } else {
-        title.innerText = 'Kirtis ant stalo (Šaukimas: ' + state.currentBid + ')';
-        state.trickCards.forEach(item => {
-            const wrapper = document.createElement('div');
-            wrapper.style.textAlign = 'center';
-
-            const div = document.createElement('div');
-            div.className = 'card ' + (item.card.isRed ? 'red' : '');
-            div.innerHTML = '<div>' + item.card.name + '</div><div>' + item.card.suit + '</div>';
-
-            const lbl = document.createElement('div');
-            lbl.style.fontSize = '11px';
-            lbl.style.marginTop = '3px';
-            lbl.innerText = state.seats.at(item.seatIndex).name;
-
-            wrapper.appendChild(div);
-            wrapper.appendChild(lbl);
-            container.appendChild(wrapper);
-        });
-    }
 }
-
+const canGivePlus = !state.myUsedPlus && (
+state.phase === 'BIDDING' ||
+((state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID') && amIHighestBidder)
+);
+if (canGivePlus) {
+addButton('➕ Duoti pliusą (kitiems po +60 tšk.)', 'danger', () => {
+if (confirm('Ar tikrai nori panaudoti savo vienkartinę pagalbą „Duoti pliusą“? Likusiems žaidėjams bus pridėta po +60 taškų.')) {
+playSound('bid');
+socket.emit('givePlus', currentRoomCode);
+}
+});
+}
+}
+function renderTableCenter(state, leftIdx, rightIdx) {
+const title = document.getElementById('centerTitle');
+const container = document.getElementById('tableCards');
+container.innerHTML = '';
+container.classList.remove('trick-fly-me', 'trick-fly-left', 'trick-fly-right');
+if (state.phase === 'LOBBY') {
+title.innerText = 'Laukia žaidėjų prisijungimo...';
+return;
+}
+if (state.talonCount > 0) {
+title.innerText = 'Bankas (3 kortos)';
+if (state.talon.length > 0) {
+state.talon.forEach(c => {
+const div = document.createElement('div');
+div.className = 'card ' + (c.isRed ? 'red' : '');
+div.innerHTML = '' + c.name + '' + c.suit + '';
+container.appendChild(div);
+});
+} else {
+for (let i = 0; i < state.talonCount; i++) {
+const div = document.createElement('div');
+div.className = 'card hidden';
+container.appendChild(div);
+}
+}
+} else {
+title.innerText = 'Kirtis ant stalo (Šaukimas: ' + state.currentBid + ')';
+state.trickCards.forEach(item => {
+const wrapper = document.createElement('div');
+wrapper.style.textAlign = 'center';
+const div = document.createElement('div');
+div.className = 'card ' + (item.card.isRed ? 'red' : '');
+div.innerHTML = '' + item.card.name + '' + item.card.suit + '';
+const lbl = document.createElement('div');
+lbl.style.fontSize = '11px';
+lbl.style.marginTop = '3px';
+lbl.innerText = state.seats.at(item.seatIndex).name;
+wrapper.appendChild(div);
+wrapper.appendChild(lbl);
+container.appendChild(wrapper);
+});
+if (state.trickCards.length === 3 && state.statusText && state.statusText.includes('Kirtį paėmė')) {
+const winnerName = state.seats.find(s => state.statusText.includes(s.name));
+if (winnerName) {
+let flyClass = 'trick-fly-me';
+if (winnerName.index === leftIdx) flyClass = 'trick-fly-left';
+else if (winnerName.index === rightIdx) flyClass = 'trick-fly-right';
+setTimeout(() => container.classList.add(flyClass), 750);
+}
+}
+}
+}
 function renderMyCards(state) {
-    const container = document.getElementById('playerCards');
-    container.innerHTML = '';
-
-    const isMyTurn = (state.currentTurnIndex === state.mySeatIndex);
-    const canClick = (state.phase === 'DISCARD_3' && isMyTurn) || (state.phase === 'PLAYING' && isMyTurn);
-
-    let indexedHand = state.myHand.map((card, originalIndex) => ({ card, originalIndex }));
-    if (state.myCardsRevealed) {
-        indexedHand.sort((a, b) => a.card.suit.localeCompare(b.card.suit) || b.card.power - a.card.power);
-    }
-
-    indexedHand.forEach(item => {
-        const div = document.createElement('div');
-        if (state.myCardsRevealed) {
-            div.className = 'card ' + (item.card.isRed ? 'red' : '') + (canClick ? ' clickable' : '');
-            div.innerHTML = '<div>' + item.card.name + '</div><div>' + item.card.suit + '</div>';
-            if (canClick) {
-                div.addEventListener('click', () => {
-                    if (state.phase === 'DISCARD_3') {
-                        playSound('card');
-                        socket.emit('discardCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
-                    } else if (state.phase === 'PLAYING') {
-                        socket.emit('playCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
+const container = document.getElementById('playerCards');
+container.innerHTML = '';
+const isMyTurn = (state.currentTurnIndex === state.mySeatIndex);
+const canClick = (state.phase === 'DISCARD_3' && isMyTurn) || (state.phase === 'PLAYING' && isMyTurn);
+let indexedHand = state.myHand.map((card, originalIndex) => ({ card, originalIndex }));
+if (state.myCardsRevealed) {
+indexedHand.sort((a, b) => a.card.suit.localeCompare(b.card.suit) || b.card.power - a.card.power);
+}
+indexedHand.forEach(item => {
+const div = document.createElement('div');
+if (state.myCardsRevealed) {
+div.className = 'card ' + (item.card.isRed ? 'red' : '') + (canClick ? ' clickable' : '');
+div.innerHTML = '' + item.card.name + '' + item.card.suit + '';
+if (canClick) {
+div.addEventListener('click', () => {
+if (state.phase === 'DISCARD_3') {
+playSound('card');
+socket.emit('discardCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
+} else if (state.phase === 'PLAYING') {
+socket.emit('playCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
 }
 });
 }
@@ -519,246 +638,4 @@ div.innerHTML = '' + avatar + ' ' + sender + ':' + text + '';
 box.appendChild(div);
 box.scrollTop = box.scrollHeight;
 });
-// --- PERGALĖS KONFETI IR SUDEGIMO ANIMACIJOS ---
-const animStyle = document.createElement('style');
-animStyle.innerHTML = `
-@keyframes screenShake {
-    0%, 100% { transform: translateX(0); }
-    15%, 45%, 75% { transform: translateX(-8px); }
-    30%, 60%, 90% { transform: translateX(8px); }
-}
-.burn-effect {
-    animation: screenShake 0.45s ease-in-out;
-    box-shadow: inset 0 0 90px rgba(239, 68, 68, 0.85) !important;
-}
-`;
-document.head.appendChild(animStyle);
-
-function triggerBurnAnimation() {
-    document.body.classList.remove('burn-effect');
-    void document.body.offsetWidth;
-    document.body.classList.add('burn-effect');
-    if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
-    setTimeout(() => document.body.classList.remove('burn-effect'), 700);
-}
-
-function triggerConfettiAnimation() {
-    const colors = ['#fbbf24', '#10b981', '#ef4444', '#3b82f6', '#ec4899', '#a855f7'];
-    for (let i = 0; i < 110; i++) {
-        const conf = document.createElement('div');
-        const size = Math.random() * 8 + 6;
-        conf.style.cssText = 'position:fixed; top:-15px; left:' + (Math.random() * 100) + 'vw; width:' + size + 'px; height:' + (size * 1.4) + 'px; background:' + colors[Math.floor(Math.random() * colors.length)] + '; z-index:9999; pointer-events:none; border-radius:2px;';
-        document.body.appendChild(conf);
-
-        const duration = Math.random() * 2000 + 2200;
-        const drift = (Math.random() - 0.5) * 200;
-        const rot = Math.random() * 720 + 360;
-
-        conf.animate([
-            { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
-            { transform: 'translate(' + drift + 'px, 105vh) rotate(' + rot + 'deg)', opacity: 0.2 }
-        ], { duration: duration, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' });
-
-        setTimeout(() => conf.remove(), duration);
-    }
-}
-
-socket.on('gameState', (state) => {
-    if (state.statusText && state.statusText.includes('SUDEGĖ') && (!lastState || lastState.statusText !== state.statusText)) {
-        triggerBurnAnimation();
-    }
-    if (state.phase === 'GAME_OVER' && (!lastState || lastState.phase !== 'GAME_OVER')) {
-        triggerConfettiAnimation();
-    }
-});
-// --- AUTOMATINIS PNG IKONĖLĖS GENERAVIMAS TELEFONAMS ---
-(function generateAppIcon() {
-    try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-
-        // Tamsiai žalias stalo fonas
-        ctx.fillStyle = '#064e3b';
-        ctx.fillRect(0, 0, 512, 512);
-
-        // Auksinis rėmelis
-        ctx.strokeStyle = '#fbbf24';
-        ctx.lineWidth = 22;
-        ctx.strokeRect(24, 24, 464, 464);
-
-        // Užrašas 1000
-        ctx.fillStyle = '#fbbf24';
-        ctx.font = '900 135px Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('1000', 256, 225);
-
-        // Kryžiaus simbolis
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '180px Arial, sans-serif';
-        ctx.fillText('♣', 256, 405);
-
-        const pngUrl = canvas.toDataURL('image/png');
-        document.querySelectorAll('link[rel*="icon"]').forEach(el => el.href = pngUrl);
-    } catch (e) {}
-})();
-// --- 4D INTERAKTYVUS STALO PASVIRIMAS IR HOLOGRAFINIS ŠVYTĖJIMAS ---
-const style4D = document.createElement('style');
-style4D.innerHTML = `
-@keyframes goldShimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-}
-.card.hidden::after {
-    background-image: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.6) 50%, transparent 70%);
-    background-size: 200% 100%;
-    animation: goldShimmer 3.5s infinite linear;
-}
-`;
-document.head.appendChild(style4D);
-
-// Stalas reaguoja į pelės judesį kompiuteryje
-document.addEventListener('mousemove', (e) => {
-    const table = document.querySelector('.poker-table');
-    if (!table || window.innerWidth <= 768) return;
-    const xAxis = (window.innerWidth / 2 - e.pageX) / 65;
-    const yAxis = (window.innerHeight / 2 - e.pageY) / 65;
-    table.style.transform = 'rotateX(' + (14 + yAxis) + 'deg) rotateY(' + (-xAxis) + 'deg)';
-});
-
-// Stalas reaguoja į telefono pavertimą (giroskopas)
-window.addEventListener('deviceorientation', (e) => {
-    const table = document.querySelector('.poker-table');
-    if (!table || !e.gamma || !e.beta) return;
-    const tiltX = Math.max(-8, Math.min(8, e.gamma / 5));
-    const tiltY = Math.max(-5, Math.min(5, (e.beta - 45) / 8));
-    table.style.transform = 'rotateX(' + (10 + tiltY) + 'deg) rotateY(' + tiltX + 'deg)';
-});
-// --- VISOS 4D VIZUALIZACIJOS FUNKCIJOS ---
-const style4D = document.createElement('style');
-style4D.innerHTML = `
-@keyframes goldShimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-}
-.card.hidden::after {
-    background-image: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.65) 50%, transparent 70%);
-    background-size: 200% 100%;
-    animation: goldShimmer 3.2s infinite linear;
-}
-/* Atmosferinis apšvietimas einant aklai */
-.poker-table.blind-aura {
-    box-shadow: inset 0 0 80px rgba(168, 85, 247, 0.55), 0 0 35px rgba(168, 85, 247, 0.7) !important;
-    border-color: #7e22ce !important;
-}
-/* Atmosferinis apšvietimas paskelbus porą */
-.poker-table.marriage-aura {
-    box-shadow: inset 0 0 90px rgba(251, 191, 36, 0.75), 0 0 45px rgba(251, 191, 36, 0.9) !important;
-}
-/* Ugninis pulsas sėdint ant 900 statinės */
-@keyframes barrelPulse {
-    0%, 100% { box-shadow: 0 0 12px rgba(249, 115, 22, 0.6); }
-    50% { box-shadow: 0 0 26px rgba(239, 68, 68, 1); }
-}
-.on-barrel {
-    animation: barrelPulse 1.6s infinite ease-in-out;
-    border-color: #f97316 !important;
-}
-/* Kirčio kortų nuskriejimo animacija */
-.trick-fly-me { transform: translate(0, 140px) scale(0.2) rotate(25deg) !important; opacity: 0 !important; transition: all 0.55s ease-in !important; }
-.trick-fly-left { transform: translate(-180px, -110px) scale(0.2) rotate(-35deg) !important; opacity: 0 !important; transition: all 0.55s ease-in !important; }
-.trick-fly-right { transform: translate(180px, -110px) scale(0.2) rotate(35deg) !important; opacity: 0 !important; transition: all 0.55s ease-in !important; }
-`;
-document.head.appendChild(style4D);
-
-// 1. Interaktyvus stalo pasvirimas (Pelė ir Giroskopas)
-document.addEventListener('mousemove', (e) => {
-    const table = document.querySelector('.poker-table');
-    if (!table || window.innerWidth <= 768) return;
-    const xAxis = (window.innerWidth / 2 - e.pageX) / 65;
-    const yAxis = (window.innerHeight / 2 - e.pageY) / 65;
-    table.style.transform = 'rotateX(' + (14 + yAxis) + 'deg) rotateY(' + (-xAxis) + 'deg)';
-});
-
-window.addEventListener('deviceorientation', (e) => {
-    const table = document.querySelector('.poker-table');
-    if (!table || !e.gamma || !e.beta) return;
-    const tiltX = Math.max(-8, Math.min(8, e.gamma / 5));
-    const tiltY = Math.max(-5, Math.min(5, (e.beta - 45) / 8));
-    table.style.transform = 'rotateX(' + (10 + tiltY) + 'deg) rotateY(' + tiltX + 'deg)';
-});
-
-// 2. Gyvos krupjė reakcijos, atmosferinės šviesos ir kirčio nuskriejimas
-socket.on('gameState', (state) => {
-    const table = document.querySelector('.poker-table');
-    const dealerEmoji = document.querySelector('.dealer-seat span');
-    const dealerSub = document.querySelector('.dealer-seat div span');
-
-    if (table) {
-        const anyoneBlind = state.seats.some(s => s.isBlind) && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER';
-        table.classList.toggle('blind-aura', anyoneBlind);
-
-        if (state.statusText && state.statusText.includes('PORĄ')) {
-            table.classList.add('marriage-aura');
-            setTimeout(() => table.classList.remove('marriage-aura'), 2200);
-        }
-    }
-
-    // Statinės (900) ugninis efektas žaidėjų dėžutėms
-    const myIdx = state.mySeatIndex;
-    const leftIdx = (myIdx + 1) % 3;
-    const rightIdx = (myIdx + 2) % 3;
-
-    const meBox = document.getElementById('box-me');
-    const leftBox = document.getElementById('box-left');
-    const rightBox = document.getElementById('box-right');
-
-    if (meBox) meBox.classList.toggle('on-barrel', state.seats.at(myIdx).totalScore >= 900);
-    if (leftBox) leftBox.classList.toggle('on-barrel', state.seats.at(leftIdx).totalScore >= 900);
-    if (rightBox) rightBox.classList.toggle('on-barrel', state.seats.at(rightIdx).totalScore >= 900);
-
-    // Krupjė gyvos emocijos
-    if (dealerEmoji && dealerSub && state.statusText) {
-        if (state.statusText.includes('SUDEGĖ')) {
-            dealerEmoji.innerText = '😱';
-            dealerSub.innerText = 'Oho, sudegė!';
-        } else if (state.statusText.includes('PORĄ')) {
-            dealerEmoji.innerText = '🥳';
-            dealerSub.innerText = 'Karališka pora!';
-        } else if (state.statusText.includes('AKLAI') || state.seats.some(s => s.isBlind)) {
-            dealerEmoji.innerText = '😎';
-            dealerSub.innerText = 'Drąsus ėjimas!';
-        } else if (state.phase === 'GAME_OVER') {
-            dealerEmoji.innerText = '🏆';
-            dealerSub.innerText = 'Sveikinimai!';
-        } else {
-            dealerEmoji.innerText = '🤵';
-            dealerSub.innerText = 'Prižiūri stalą';
-        }
-    }
-
-    // Kirčio kortų nuskriejimas į laimėtojo pusę
-    if (state.trickCards && state.trickCards.length === 3 && state.statusText && state.statusText.includes('Kirtį paėmė')) {
-        const winnerName = state.seats.find(s => state.statusText.includes(s.name));
-        if (winnerName) {
-            let flyClass = 'trick-fly-me';
-            if (winnerName.index === leftIdx) flyClass = 'trick-fly-left';
-            else if (winnerName.index === rightIdx) flyClass = 'trick-fly-right';
-
-            setTimeout(() => {
-                const tableCardsEl = document.getElementById('tableCards');
-                if (tableCardsEl) tableCardsEl.classList.add(flyClass);
-            }, 750);
-        }
-    } else {
-        const tableCardsEl = document.getElementById('tableCards');
-        if (tableCardsEl) {
-            tableCardsEl.classList.remove('trick-fly-me', 'trick-fly-left', 'trick-fly-right');
-        }
-    }
-});
 // PABAIGA
-
-
-

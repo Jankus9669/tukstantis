@@ -458,8 +458,6 @@ function finishRound(roomCode) {
     broadcastState(roomCode);
 }
 
-    broadcastState(roomCode);
-}
 function checkBotAction(roomCode) {
     const room = rooms[roomCode];
     if (!room || room.phase === 'NINE_GUESS') return;

@@ -515,6 +515,86 @@
                 border-bottom-width: 14px !important;
             }
         }
+        /* --- PRABANGUS KORTŲ PRIEKIO IR NUGARĖLĖS DIZAINAS --- */
+        .card {
+            background: linear-gradient(145deg, #ffffff 0%, #fefce8 65%, #fef3c7 100%) !important;
+            border: 1.5px solid #d97706 !important;
+            border-bottom: 4px solid #b45309 !important;
+            border-radius: 10px !important;
+            position: relative;
+            overflow: hidden;
+            font-family: 'Georgia', serif !important;
+        }
+        /* Plonas auksinis rėmelis kortos priekio viduje */
+        .card:not(.hidden)::before {
+            content: "";
+            position: absolute;
+            top: 4px; left: 4px; right: 4px; bottom: 4px;
+            border: 1px solid rgba(217, 119, 6, 0.35);
+            border-radius: 6px;
+            pointer-events: none;
+        }
+        .card:not(.hidden) div:first-child {
+            font-size: 21px;
+            font-weight: 900;
+            line-height: 1;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+        }
+        .card:not(.hidden) div:last-child {
+            font-size: 25px;
+            line-height: 1.05;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.12));
+        }
+        .card.red {
+            color: #b91c1c !important;
+        }
+        .card:not(.red):not(.hidden) {
+            color: #0f172a !important;
+        }
+
+        /* Karališka nugarėlė su auksiniu rėmu ir „1000“ herbu */
+        .card.hidden {
+            background: 
+                radial-gradient(circle at center, rgba(251, 191, 36, 0.25) 0%, transparent 65%),
+                repeating-linear-gradient(45deg, rgba(251, 191, 36, 0.14) 0px, rgba(251, 191, 36, 0.14) 2px, transparent 2px, transparent 8px),
+                repeating-linear-gradient(-45deg, rgba(251, 191, 36, 0.14) 0px, rgba(251, 191, 36, 0.14) 2px, transparent 2px, transparent 8px),
+                linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%) !important;
+            border: 2px solid #fbbf24 !important;
+            border-bottom: 4px solid #b45309 !important;
+            color: transparent !important;
+        }
+        .card.hidden::before {
+            content: "";
+            position: absolute;
+            top: 4px; left: 4px; right: 4px; bottom: 4px;
+            border: 1.5px solid rgba(251, 191, 36, 0.75);
+            border-radius: 5px;
+            pointer-events: none;
+        }
+        .card.hidden::after {
+            content: "1000";
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-25deg);
+            font-family: 'Georgia', serif;
+            font-size: 13px;
+            font-weight: bold;
+            color: #fbbf24;
+            background: rgba(15, 23, 42, 0.9);
+            padding: 2px 5px;
+            border: 1px solid #fbbf24;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+        .card.small.hidden::after {
+            font-size: 9px;
+            padding: 1px 3px;
+        }
+        @media (max-width: 768px) {
+            .card:not(.hidden) div:first-child { font-size: 16px; }
+            .card:not(.hidden) div:last-child { font-size: 19px; }
+            .card.hidden::after { font-size: 10px; padding: 1px 3px; }
+        }
 
     </style>
 </head>

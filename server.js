@@ -435,7 +435,7 @@ function finishRound(roomCode) {
 
     room.roundStarterIndex = (room.roundStarterIndex + 1) % 3;
 
-        const sweepWinner = room.seats.find(s => s.tricksWon === 8);
+        const sweepWinner = room.seats.find(s => s.tricksWon === 7);
     const sweepPrefix = sweepWinner ? ('⚔️ SAUSAS SUTRIUŠKINIMAS! ' + sweepWinner.name + ' sudorojo priešininkus nedavęs nė vieno kirčio! ') : '';
 
     const loser = room.seats.find(s => s.totalScore <= -500);

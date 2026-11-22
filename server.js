@@ -404,18 +404,19 @@ function finishRound(roomCode) {
     let summary = 'Partija baigta! ';
 
     const bidder = room.seats[room.highestBidderIndex];
-    const bidWon = bidder.roundScore >= room.currentBid;
-    const isBlindRound = bidder.isBlind;
+    const bidAmount = Number(room.currentBid) || 100;
+    const bidWon = (bidder.roundScore >= bidAmount);
+    const isBlindRound = Boolean(bidder.isBlind);
     const mult = isBlindRound ? 2 : 1;
 
     if (bidWon) {
-        const earned = room.currentBid * mult;
+        const earned = bidAmount * mult;
         bidder.totalScore += earned;
-        summary += bidder.name + ' įvykdė šaukimą (' + room.currentBid + ') +' + earned + ' tšk.! ';
+        summary += bidder.name + ' įvykdė šaukimą (' + bidAmount + ') +' + earned + ' tšk.! ';
     } else {
-        const lost = room.currentBid * mult;
+        const lost = bidAmount * mult;
         bidder.totalScore -= lost;
-        summary += bidder.name + ' SUDEGĖ (' + bidder.roundScore + '/' + room.currentBid + ') -' + lost + ' tšk.! ';
+        summary += bidder.name + ' SUDEGĖ (' + bidder.roundScore + '/' + bidAmount + ') -' + lost + ' tšk.! ';
     }
 
     if (isBlindRound) {
@@ -455,6 +456,7 @@ function finishRound(roomCode) {
     } else {
         room.statusText = sweepPrefix + summary;
     }
+
     broadcastState(roomCode);
 }
 

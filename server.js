@@ -221,6 +221,7 @@ function startRound(roomCode) {
     room.seats.forEach((seat, i) => {
         seat.hand = deck.slice(i * 7, (i + 1) * 7);
         seat.roundScore = 0;
+        seat.tricksWon = 0;
         seat.cardsRevealed = false;
         seat.isBlind = false;
         seat.passed = false;
@@ -377,6 +378,7 @@ function evaluateTrick(roomCode) {
 
     let pts = room.trickCards.reduce((sum, item) => sum + item.card.value, 0);
     room.seats[winnerObj.seatIndex].roundScore += pts;
+    room.seats[winnerObj.seatIndex].tricksWon = (room.seats[winnerObj.seatIndex].tricksWon || 0) + 1;
     room.statusText = 'Kirtį paėmė ' + room.seats[winnerObj.seatIndex].name + ' (+' + pts + ' tšk.)!';
     broadcastState(roomCode);
 
@@ -433,18 +435,21 @@ function finishRound(roomCode) {
 
     room.roundStarterIndex = (room.roundStarterIndex + 1) % 3;
 
+        const sweepWinner = room.seats.find(s => s.tricksWon === 8);
+    const sweepPrefix = sweepWinner ? ('⚔️ SAUSAS SUTRIUŠKINIMAS! ' + sweepWinner.name + ' sudorojo priešininkus nedavęs nė vieno kirčio! ') : '';
+
     const loser = room.seats.find(s => s.totalScore <= -500);
     const gameWinner = room.seats.find(s => s.totalScore >= 1000);
 
     if (loser) {
         room.phase = 'GAME_OVER';
         const topPlayer = [...room.seats].sort((a, b) => b.totalScore - a.totalScore).at(0);
-        room.statusText = '💥 ' + loser.name + ' pasiekė ' + loser.totalScore + ' taškų ir PRALAIMĖJO! 🏆 Laimėjo ' + topPlayer.name + ' (' + topPlayer.totalScore + ' tšk.)!';
+        room.statusText = sweepPrefix + '💥 ' + loser.name + ' pasiekė ' + loser.totalScore + ' taškų ir PRALAIMĖJO! 🏆 Laimėjo ' + topPlayer.name + ' (' + topPlayer.totalScore + ' tšk.)!';
     } else if (gameWinner) {
         room.phase = 'GAME_OVER';
-        room.statusText = '🏆 ' + gameWinner.name + ' LAIMĖJO ŽAIDIMĄ pasiekęs ' + gameWinner.totalScore + ' taškų!';
+        room.statusText = sweepPrefix + '🏆 ' + gameWinner.name + ' LAIMĖJO ŽAIDIMĄ pasiekęs ' + gameWinner.totalScore + ' taškų!';
     } else {
-        room.statusText = summary;
+        room.statusText = sweepPrefix + summary;
     }
     broadcastState(roomCode);
 }

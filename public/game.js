@@ -579,4 +579,46 @@ socket.on('chatMessage', ({ sender, avatar, text }) => {
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
 });
+// --- SAUSO SUTRIUŠKINIMO (0 KIRČIŲ PRIEŠININKAMS) EFEKTAS ---
+const sweepStyle = document.createElement('style');
+sweepStyle.innerHTML = `
+@keyframes sweepPop {
+    0% { transform: translate(-50%, -50%) scale(0.3) rotate(-8deg); opacity: 0; }
+    60% { transform: translate(-50%, -50%) scale(1.08) rotate(2deg); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+}
+.sweep-banner {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: radial-gradient(circle, #7f1d1d 0%, #1e1b4b 100%);
+    border: 4px solid #fbbf24; border-radius: 24px; padding: 24px 32px;
+    text-align: center; z-index: 10000; max-width: 90%; width: 420px;
+    box-shadow: 0 0 60px rgba(239, 68, 68, 0.9), 0 0 100px rgba(251, 191, 36, 0.6);
+    animation: sweepPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    cursor: pointer;
+}
+`;
+document.head.appendChild(sweepStyle);
+
+let lastSweepText = '';
+socket.on('gameState', (state) => {
+    if (state.statusText && state.statusText.includes('SAUSAS SUTRIUŠKINIMAS') && lastSweepText !== state.statusText) {
+        lastSweepText = state.statusText;
+        playSound('marriage');
+        setTimeout(() => playSound('win'), 250);
+        triggerConfettiAnimation();
+
+        const winnerObj = state.seats.find(s => state.statusText.includes(s.name + ' sudorojo'));
+        const wName = winnerObj ? winnerObj.name : 'Žaidėjas';
+
+        const banner = document.createElement('div');
+        banner.className = 'sweep-banner';
+        banner.innerHTML = '<div style="font-size:54px; margin-bottom:6px;">⚔️👑⚔️</div>' +
+            '<div style="font-size:24px; font-weight:900; color:#fbbf24; letter-spacing:1px; text-shadow:0 2px 10px rgba(0,0,0,0.8);">SAUSAS SUTRIUŠKINIMAS!</div>' +
+            '<div style="font-size:15px; color:#f8fafc; margin-top:8px; line-height:1.4;"><strong>' + wName + '</strong> visiškai sudorojo priešininkus nedavęs jiems nė vieno kirčio!</div>';
+        banner.addEventListener('click', () => banner.remove());
+        document.body.appendChild(banner);
+        setTimeout(() => banner.remove(), 4500);
+    }
+});
 // PABAIGA
+

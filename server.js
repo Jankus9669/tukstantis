@@ -25,11 +25,11 @@ function createSolidPng(size) {
             const isCenterDiamond = Math.abs(x - size / 2) + Math.abs(y - size / 2) < size * 0.24;
 
             if (isBorder) {
-                rawData[px] = 15; rawData[px + 1] = 23; rawData[px + 2] = 42; rawData[px + 3] = 255;
+                rawData.writeUInt8(15, px); rawData.writeUInt8(23, px + 1); rawData.writeUInt8(42, px + 2); rawData.writeUInt8(255, px + 3);
             } else if (isInnerGold || isCenterDiamond) {
-                rawData[px] = 251; rawData[px + 1] = 191; rawData[px + 2] = 36; rawData[px + 3] = 255;
+                rawData.writeUInt8(251, px); rawData.writeUInt8(191, px + 1); rawData.writeUInt8(36, px + 2); rawData.writeUInt8(255, px + 3);
             } else {
-                rawData[px] = 6; rawData[px + 1] = 78; rawData[px + 2] = 59; rawData[px + 3] = 255;
+                rawData.writeUInt8(6, px); rawData.writeUInt8(78, px + 1); rawData.writeUInt8(59, px + 2); rawData.writeUInt8(255, px + 3);
             }
         }
     }
@@ -52,12 +52,12 @@ function createSolidPng(size) {
         return Buffer.concat([lenBuf, typeBuf, data, crcBuf]);
     }
 
-    const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    const sig = Buffer.from('89504e470d0a1a0a', 'hex');
     const ihdr = Buffer.alloc(13);
     ihdr.writeUInt32BE(size, 0);
     ihdr.writeUInt32BE(size, 4);
-    ihdr[8] = 8;
-    ihdr[9] = 6;
+    ihdr.writeUInt8(8, 8);
+    ihdr.writeUInt8(6, 9);
     return Buffer.concat([sig, makeChunk('IHDR', ihdr), makeChunk('IDAT', compressed), makeChunk('IEND', Buffer.alloc(0))]);
 }
 
@@ -190,8 +190,8 @@ function broadcastState(roomCode) {
                 myHand: seat.hand,
                 myCardsRevealed: seat.cardsRevealed,
                 myIsBlind: seat.isBlind,
-                myUsedPlus: !!seat.usedPlus,
-                myUsedNineGuess: !!seat.usedNineGuess,
+                myUsedPlus: !!s.usedPlus,
+                myUsedNineGuess: !!s.usedNineGuess,
                 nineGuess: guessInfo,
                 seats: publicSeats,
                 phase: room.phase,
@@ -292,7 +292,7 @@ function finishBidding(roomCode) {
         room.showTalon = false;
 
         if (winner.isBot) {
-            let sorted = [...winner.hand].sort((a, b) => a.power - b.power);
+            let sorted = Array.from(winner.hand).sort((a, b) => a.power - b.power);
             room.discardedPile = sorted.slice(0, 3);
             room.discardedPile.forEach(dc => {
                 let idx = winner.hand.indexOf(dc);
@@ -363,6 +363,7 @@ function evaluateNineGuess(roomCode) {
 
 function evaluateTrick(roomCode) {
     const room = rooms[roomCode];
+    if (!room) return;
     let winnerObj = room.trickCards.at(0);
 
     for (let i = 1; i < room.trickCards.length; i++) {
@@ -381,6 +382,7 @@ function evaluateTrick(roomCode) {
     broadcastState(roomCode);
 
     setTimeout(() => {
+        if (!rooms[roomCode]) return;
         room.trickCards = [];
         if (room.seats.at(0).hand.length === 0) {
             finishRound(roomCode);
@@ -395,6 +397,7 @@ function evaluateTrick(roomCode) {
 
 function finishRound(roomCode) {
     const room = rooms[roomCode];
+    if (!room) return;
     room.phase = 'ROUND_OVER';
     let summary = 'Partija baigta! ';
 
@@ -441,7 +444,7 @@ function finishRound(roomCode) {
 
     if (loser) {
         room.phase = 'GAME_OVER';
-        const topPlayer = [...room.seats].sort((a, b) => b.totalScore - a.totalScore).at(0);
+        const topPlayer = Array.from(room.seats).sort((a, b) => b.totalScore - a.totalScore).at(0);
         room.statusText = sweepPrefix + '💥 ' + loser.name + ' pasiekė ' + loser.totalScore + ' taškų ir PRALAIMĖJO! 🏆 Laimėjo ' + topPlayer.name + ' (' + topPlayer.totalScore + ' tšk.)!';
     } else if (gameWinner) {
         room.phase = 'GAME_OVER';

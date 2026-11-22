@@ -385,7 +385,7 @@ function evaluateTrick(roomCode) {
     setTimeout(() => {
         if (!rooms[roomCode]) return;
         room.trickCards = [];
-        if (room.seats.at(0).hand.length === 0) {
+        if (room.seats[0].hand.length === 0) {
             finishRound(roomCode);
         } else {
             room.currentTurnIndex = winnerObj.seatIndex;
@@ -423,8 +423,9 @@ function finishRound(roomCode) {
         summary += '[Aklas žaidimas: kitų taškai x2!] ';
     }
 
-    room.seats.forEach((s, idx) => {
+    for (let idx = 0; idx < room.seats.length; idx++) {
         if (idx !== room.highestBidderIndex) {
+            const s = room.seats[idx];
             let rounded = (Math.round(s.roundScore / 5) * 5) * mult;
             if (s.totalScore >= 900) {
                 summary += s.name + ' ant statinės (900). ';
@@ -435,7 +436,7 @@ function finishRound(roomCode) {
                 s.totalScore += rounded;
             }
         }
-    });
+    }
 
     room.roundStarterIndex = (room.roundStarterIndex + 1) % 3;
 
@@ -447,17 +448,25 @@ function finishRound(roomCode) {
 
     if (loser) {
         room.phase = 'GAME_OVER';
-        let topPlayer = room.seats.at(0);
-        room.seats.forEach(s => { if (s.totalScore > topPlayer.totalScore) topPlayer = s; });
+        let topPlayer = room.seats[0];
+        for (let i = 1; i < room.seats.length; i++) {
+            if (room.seats[i].totalScore > topPlayer.totalScore) topPlayer = room.seats[i];
+        }
         room.statusText = sweepPrefix + '💥 ' + loser.name + ' pasiekė ' + loser.totalScore + ' taškų ir PRALAIMĖJO! 🏆 Laimėjo ' + topPlayer.name + ' (' + topPlayer.totalScore + ' tšk.)!';
+        broadcastState(roomCode);
     } else if (gameWinner) {
         room.phase = 'GAME_OVER';
         room.statusText = sweepPrefix + '🏆 ' + gameWinner.name + ' LAIMĖJO ŽAIDIMĄ pasiekęs ' + gameWinner.totalScore + ' taškų!';
+        broadcastState(roomCode);
     } else {
-        room.statusText = sweepPrefix + summary;
+        room.statusText = sweepPrefix + summary + ' (Krupjė automatiškai dalins po 4 sek...)';
+        broadcastState(roomCode);
+        setTimeout(() => {
+            if (rooms[roomCode] && rooms[roomCode].phase === 'ROUND_OVER') {
+                startRound(roomCode);
+            }
+        }, 4000);
     }
-
-    broadcastState(roomCode);
 }
 
 function checkBotAction(roomCode) {

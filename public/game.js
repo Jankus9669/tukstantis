@@ -603,5 +603,38 @@ socket.on('gameState', (state) => {
         document.querySelectorAll('link[rel*="icon"]').forEach(el => el.href = pngUrl);
     } catch (e) {}
 })();
+// --- 4D INTERAKTYVUS STALO PASVIRIMAS IR HOLOGRAFINIS ŠVYTĖJIMAS ---
+const style4D = document.createElement('style');
+style4D.innerHTML = `
+@keyframes goldShimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+.card.hidden::after {
+    background-image: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.6) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: goldShimmer 3.5s infinite linear;
+}
+`;
+document.head.appendChild(style4D);
+
+// Stalas reaguoja į pelės judesį kompiuteryje
+document.addEventListener('mousemove', (e) => {
+    const table = document.querySelector('.poker-table');
+    if (!table || window.innerWidth <= 768) return;
+    const xAxis = (window.innerWidth / 2 - e.pageX) / 65;
+    const yAxis = (window.innerHeight / 2 - e.pageY) / 65;
+    table.style.transform = 'rotateX(' + (14 + yAxis) + 'deg) rotateY(' + (-xAxis) + 'deg)';
+});
+
+// Stalas reaguoja į telefono pavertimą (giroskopas)
+window.addEventListener('deviceorientation', (e) => {
+    const table = document.querySelector('.poker-table');
+    if (!table || !e.gamma || !e.beta) return;
+    const tiltX = Math.max(-8, Math.min(8, e.gamma / 5));
+    const tiltY = Math.max(-5, Math.min(5, (e.beta - 45) / 8));
+    table.style.transform = 'rotateX(' + (10 + tiltY) + 'deg) rotateY(' + tiltX + 'deg)';
+});
 // PABAIGA
+
 

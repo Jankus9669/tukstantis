@@ -155,8 +155,12 @@ function triggerBurnAnimation() {
     document.body.classList.remove('burn-effect');
     void document.body.offsetWidth;
     document.body.classList.add('burn-effect');
-    if (navigator.vibrate) navigator.vibrate();
-    setTimeout(() => document.body.classList.remove('burn-effect'), 700);
+    setTimeout(() => {
+        document.body.classList.remove('burn-effect');
+    }, 1200);
+    try {
+        if (navigator.vibrate) navigator.vibrate([180, 80, 180]);
+    } catch (e) {}
 }
 
 function triggerConfettiAnimation() {
@@ -251,6 +255,9 @@ socket.on('gameState', (state) => {
         if ((state.phase === 'ROUND_OVER' || state.phase === 'GAME_OVER') && lastState.phase === 'PLAYING') playSound('win');
         if (state.statusText && state.statusText.includes('SUDEGĖ') && lastState.statusText !== state.statusText) triggerBurnAnimation();
         if (state.phase === 'GAME_OVER' && lastState.phase !== 'GAME_OVER') triggerConfettiAnimation();
+    }
+    if (state.phase === 'BIDDING' || state.phase === 'LOBBY') {
+        document.body.classList.remove('burn-effect');
     }
 
     lastState = state;

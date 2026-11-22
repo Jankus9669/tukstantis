@@ -374,18 +374,18 @@ function renderControls(state) {
         if (!amIHighestBidder || state.currentBid > 100) {
             addButton('Pasuoti', 'danger', () => { playSound('bid'); socket.emit('passBid', currentRoomCode); });
         }
-        } else if (state.phase === 'RAISE_BID' && amIHighestBidder) {
+            } else if (state.phase === 'RAISE_BID' && amIHighestBidder) {
         const stepper = document.createElement('div');
         stepper.style.cssText = 'display:inline-flex; align-items:center; gap:8px; background:rgba(15,23,42,0.85); padding:6px 10px; border-radius:12px; border:1px solid #fbbf24;';
 
         const minusBtn = document.createElement('button');
-        minusBtn.innerText = '➖ -100';
+        minusBtn.innerText = '➖ -10';
         minusBtn.className = 'danger';
-        minusBtn.disabled = (state.currentBid - 100 < state.minBidAfterWin);
+        minusBtn.disabled = (state.currentBid - 10 < state.minBidAfterWin);
         minusBtn.style.opacity = minusBtn.disabled ? '0.4' : '1';
         minusBtn.addEventListener('click', () => {
             playSound('bid');
-            socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: -100 });
+            socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: -10 });
         });
 
         const valLabel = document.createElement('span');
@@ -393,12 +393,12 @@ function renderControls(state) {
         valLabel.style.cssText = 'font-size:20px; font-weight:900; color:#fbbf24; min-width:48px; text-align:center;';
 
         const plusBtn = document.createElement('button');
-        plusBtn.innerText = '➕ +100';
-        plusBtn.disabled = (state.currentBid + 100 > 400);
+        plusBtn.innerText = '➕ +10';
+        plusBtn.disabled = (state.currentBid + 10 > 400);
         plusBtn.style.opacity = plusBtn.disabled ? '0.4' : '1';
         plusBtn.addEventListener('click', () => {
             playSound('bid');
-            socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: 100 });
+            socket.emit('adjustBidAfterTalon', { roomCode: currentRoomCode, delta: 10 });
         });
 
         stepper.appendChild(minusBtn);
@@ -410,6 +410,7 @@ function renderControls(state) {
             playSound('bid');
             socket.emit('confirmBidAndPlay', currentRoomCode);
         });
+
 
     } else if (state.phase === 'ROUND_OVER') {
         if (state.mySeatIndex === 0) {

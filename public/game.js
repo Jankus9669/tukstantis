@@ -656,5 +656,84 @@ socket.on('gameState', (state) => {
         setTimeout(() => banner.remove(), 4500);
     }
 });
+// --- 5D VIZUALIZACIJA: DALELĖS, PROŽEKTORIUS, RATILAI IR HAPTIKA ---
+const style5D = document.createElement('style');
+style5D.innerHTML = `
+@keyframes floatDust {
+    0% { transform: translateY(0) scale(0.8); opacity: 0; }
+    30% { opacity: 0.75; }
+    100% { transform: translateY(-160px) scale(1.2); opacity: 0; }
+}
+.gold-dust {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: radial-gradient(circle, #fde68a 0%, #f59e0b 100%);
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow: 0 0 8px #fbbf24;
+    z-index: 2;
+}
+@keyframes rippleWave {
+    0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; }
+    100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
+}
+.touch-ripple {
+    position: fixed;
+    width: 40px;
+    height: 40px;
+    border: 2px solid #fbbf24;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    animation: rippleWave 0.65s ease-out forwards;
+}
+.card.spotlight-card {
+    background-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.65) 0%, transparent 60%), linear-gradient(145deg, #ffffff 0%, #fefce8 65%, #fef3c7 100%) !important;
+}
+`;
+document.head.appendChild(style5D);
+
+// 1. Plaukiojančios auksinės dulkelės virš stalo
+setInterval(() => {
+    const table = document.querySelector('.poker-table');
+    if (!table || document.getElementById('gameScreen').style.display === 'none') return;
+    const dust = document.createElement('div');
+    dust.className = 'gold-dust';
+    dust.style.left = (Math.random() * 80 + 10) + '%';
+    dust.style.top = (Math.random() * 60 + 30) + '%';
+    const dur = Math.random() * 2500 + 2500;
+    dust.style.animation = 'floatDust ' + dur + 'ms ease-out forwards';
+    table.appendChild(dust);
+    setTimeout(() => dust.remove(), dur);
+}, 450);
+
+// 2. Dinaminis šviesos prožektorius ant kortų vedant pelę
+document.addEventListener('mousemove', (e) => {
+    const card = e.target.closest('.card:not(.hidden)');
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    card.classList.add('spotlight-card');
+    card.style.setProperty('--mx', x + '%');
+    card.style.setProperty('--my', y + '%');
+});
+
+// 3. Auksinis šviesos ratilas ir jutiminė vibracija palietus / paspaudus
+document.addEventListener('pointerdown', (e) => {
+    const ripple = document.createElement('div');
+    ripple.className = 'touch-ripple';
+    ripple.style.left = e.clientX + 'px';
+    ripple.style.top = e.clientY + 'px';
+    document.body.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 650);
+
+    if (navigator.vibrate) {
+        if (e.target.closest('.card.clickable')) navigator.vibrate(25);
+        else if (e.target.closest('button')) navigator.vibrate(15);
+    }
+});
 // PABAIGA
+
 

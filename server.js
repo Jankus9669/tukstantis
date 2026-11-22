@@ -512,7 +512,10 @@ function checkBotAction(roomCode) {
 
 function executePlayCard(roomCode, seatIdx, card) {
     const room = rooms[roomCode];
+    if (!room) return;
     const seat = room.seats[seatIdx];
+    if (!seat || !card) return;
+
 
     if (room.trickCards.length === 0 && (card.name === 'Q' || card.name === 'K')) {
         let partner = card.name === 'Q' ? 'K' : 'Q';

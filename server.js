@@ -190,8 +190,9 @@ function broadcastState(roomCode) {
                 myHand: seat.hand,
                 myCardsRevealed: seat.cardsRevealed,
                 myIsBlind: seat.isBlind,
-                myUsedPlus: !!s.usedPlus,
-                myUsedNineGuess: !!s.usedNineGuess,
+                                 myUsedPlus: !!seat.usedPlus,
+                myUsedNineGuess: !!seat.usedNineGuess,
+               
                 nineGuess: guessInfo,
                 seats: publicSeats,
                 phase: room.phase,

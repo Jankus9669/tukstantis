@@ -711,7 +711,7 @@ if (!room || room.phase !== 'RAISE_BID') return;
 const seatIdx = room.seats.findIndex(s => s.socketId === socket.id);
 if (seatIdx !== room.highestBidderIndex) return;
 let nextVal = room.currentBid + delta;
-if (nextVal >= room.minBidAfterWin && nextVal <= 300) { room.currentBid = nextVal; broadcastState(roomCode); }
+if (nextVal >= room.minBidAfterWin && nextVal <= 400) { room.currentBid = nextVal; broadcastState(roomCode); }
 });
 socket.on('confirmBidAndPlay', (roomCode) => {
 const room = rooms[roomCode];

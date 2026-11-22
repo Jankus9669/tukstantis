@@ -411,11 +411,16 @@ function renderControls(state) {
             socket.emit('confirmBidAndPlay', currentRoomCode);
         });
 
-    } else if (state.phase === 'ROUND_OVER' && state.mySeatIndex === 0) {
-        addButton('Dalinti kitą partiją ➡️', 'success', () => socket.emit('nextRound', currentRoomCode));
-    } else if (state.phase === 'GAME_OVER' && state.mySeatIndex === 0) {
-        addButton('Žaisti naują žaidimą 🔄', 'success', () => socket.emit('startGame', currentRoomCode));
+    } else if (state.phase === 'ROUND_OVER') {
+        if (state.mySeatIndex === 0) {
+            addButton('Dalinti kitą partiją ➡️', 'success', () => socket.emit('nextRound', currentRoomCode));
+        }
+    } else if (state.phase === 'GAME_OVER') {
+        if (state.mySeatIndex === 0) {
+            addButton('Žaisti naują žaidimą 🔄', 'success', () => socket.emit('startGame', currentRoomCode));
+        }
     }
+
 
     const myNines = (state.myHand || []).filter(c => c.name === '9');
     const canOfferNineGuess = state.myCardsRevealed && myNines.length === 3 && !state.myUsedNineGuess && (state.phase === 'BIDDING' || ((state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID') && amIHighestBidder));

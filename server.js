@@ -399,6 +399,7 @@ function evaluateTrick(roomCode) {
 function finishRound(roomCode) {
     const room = rooms[roomCode];
     if (!room) return;
+
     room.phase = 'ROUND_OVER';
     let summary = 'Partija baigta! ';
 
@@ -445,7 +446,8 @@ function finishRound(roomCode) {
 
     if (loser) {
         room.phase = 'GAME_OVER';
-        const topPlayer = Array.from(room.seats).sort((a, b) => b.totalScore - a.totalScore).at(0);
+        let topPlayer = room.seats.at(0);
+        room.seats.forEach(s => { if (s.totalScore > topPlayer.totalScore) topPlayer = s; });
         room.statusText = sweepPrefix + '💥 ' + loser.name + ' pasiekė ' + loser.totalScore + ' taškų ir PRALAIMĖJO! 🏆 Laimėjo ' + topPlayer.name + ' (' + topPlayer.totalScore + ' tšk.)!';
     } else if (gameWinner) {
         room.phase = 'GAME_OVER';
@@ -453,6 +455,9 @@ function finishRound(roomCode) {
     } else {
         room.statusText = sweepPrefix + summary;
     }
+    broadcastState(roomCode);
+}
+
     broadcastState(roomCode);
 }
 function checkBotAction(roomCode) {

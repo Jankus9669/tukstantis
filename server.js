@@ -664,11 +664,19 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('revealCards', (roomCode) => {
+           socket.on('revealCards', (roomCode) => {
         const room = rooms[roomCode];
         if (!room) return;
         const seat = room.seats.find(s => s.socketId === socket.id);
-        if (seat) { seat.cardsRevealed = true; broadcastState(roomCode); }
+        if (seat) {
+            seat.cardsRevealed = true;
+            if (seat.isBlind) {
+                seat.isBlind = false;
+                seat.bidStatus = 'Pasižiūrėjo (' + room.currentBid + ')';
+                room.statusText = '👀 ' + seat.name + ' pasižiūrėjo į kortas (aklas x2 atšauktas)!';
+            }
+            broadcastState(roomCode);
+        }
     });
 
     socket.on('placeBid', ({ roomCode, blind }) => {
@@ -676,11 +684,35 @@ io.on('connection', (socket) => {
         if (!room || room.phase !== 'BIDDING') return;
         const seatIdx = room.seats.findIndex(s => s.socketId === socket.id);
         if (seatIdx !== room.currentTurnIndex) return;
-        if (blind) room.seats[seatIdx].isBlind = true;
+
+        const seat = room.seats[seatIdx];
+        if (blind && !seat.cardsRevealed) {
+            seat.isBlind = true;
+        } else {
+            seat.isBlind = false;
+        }
+
         room.currentBid += 10;
         room.highestBidderIndex = seatIdx;
-        room.seats[seatIdx].bidStatus = 'Stato: ' + room.currentBid;
-        advanceBidding(roomCode);
+        seat.bidStatus = seat.isBlind ? ('🙈 Aklai: ' + room.currentBid + ' [x2]') : ('Stato: ' + room.currentBid);
+
+        const activeCount = room.seats.filter(s => !s.passed).length;
+        if (activeCount <= 1) {
+            finishBidding(roomCode);
+            return;
+        }
+
+        do {
+            room.currentTurnIndex = (room.currentTurnIndex + 1) % 3;
+        } while (room.seats[room.currentTurnIndex].passed);
+
+        if (seat.isBlind) {
+            room.statusText = '🙈 ' + seat.name + ' stato AKLAI ' + room.currentBid + ' [x2]! Dabar stato ' + room.seats[room.currentTurnIndex].name + '.';
+        } else {
+            room.statusText = 'Varžytinės: ' + seat.name + ' pastatė ' + room.currentBid + '. Dabar stato ' + room.seats[room.currentTurnIndex].name + '.';
+        }
+        broadcastState(roomCode);
+        checkBotAction(roomCode);
     });
 
     socket.on('passBid', (roomCode) => {

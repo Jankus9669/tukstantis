@@ -635,6 +635,130 @@ window.addEventListener('deviceorientation', (e) => {
     const tiltY = Math.max(-5, Math.min(5, (e.beta - 45) / 8));
     table.style.transform = 'rotateX(' + (10 + tiltY) + 'deg) rotateY(' + tiltX + 'deg)';
 });
+// --- VISOS 4D VIZUALIZACIJOS FUNKCIJOS ---
+const style4D = document.createElement('style');
+style4D.innerHTML = `
+@keyframes goldShimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+.card.hidden::after {
+    background-image: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.65) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: goldShimmer 3.2s infinite linear;
+}
+/* Atmosferinis apšvietimas einant aklai */
+.poker-table.blind-aura {
+    box-shadow: inset 0 0 80px rgba(168, 85, 247, 0.55), 0 0 35px rgba(168, 85, 247, 0.7) !important;
+    border-color: #7e22ce !important;
+}
+/* Atmosferinis apšvietimas paskelbus porą */
+.poker-table.marriage-aura {
+    box-shadow: inset 0 0 90px rgba(251, 191, 36, 0.75), 0 0 45px rgba(251, 191, 36, 0.9) !important;
+}
+/* Ugninis pulsas sėdint ant 900 statinės */
+@keyframes barrelPulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(249, 115, 22, 0.6); }
+    50% { box-shadow: 0 0 26px rgba(239, 68, 68, 1); }
+}
+.on-barrel {
+    animation: barrelPulse 1.6s infinite ease-in-out;
+    border-color: #f97316 !important;
+}
+/* Kirčio kortų nuskriejimo animacija */
+.trick-fly-me { transform: translate(0, 140px) scale(0.2) rotate(25deg) !important; opacity: 0 !important; transition: all 0.55s ease-in !important; }
+.trick-fly-left { transform: translate(-180px, -110px) scale(0.2) rotate(-35deg) !important; opacity: 0 !important; transition: all 0.55s ease-in !important; }
+.trick-fly-right { transform: translate(180px, -110px) scale(0.2) rotate(35deg) !important; opacity: 0 !important; transition: all 0.55s ease-in !important; }
+`;
+document.head.appendChild(style4D);
+
+// 1. Interaktyvus stalo pasvirimas (Pelė ir Giroskopas)
+document.addEventListener('mousemove', (e) => {
+    const table = document.querySelector('.poker-table');
+    if (!table || window.innerWidth <= 768) return;
+    const xAxis = (window.innerWidth / 2 - e.pageX) / 65;
+    const yAxis = (window.innerHeight / 2 - e.pageY) / 65;
+    table.style.transform = 'rotateX(' + (14 + yAxis) + 'deg) rotateY(' + (-xAxis) + 'deg)';
+});
+
+window.addEventListener('deviceorientation', (e) => {
+    const table = document.querySelector('.poker-table');
+    if (!table || !e.gamma || !e.beta) return;
+    const tiltX = Math.max(-8, Math.min(8, e.gamma / 5));
+    const tiltY = Math.max(-5, Math.min(5, (e.beta - 45) / 8));
+    table.style.transform = 'rotateX(' + (10 + tiltY) + 'deg) rotateY(' + tiltX + 'deg)';
+});
+
+// 2. Gyvos krupjė reakcijos, atmosferinės šviesos ir kirčio nuskriejimas
+socket.on('gameState', (state) => {
+    const table = document.querySelector('.poker-table');
+    const dealerEmoji = document.querySelector('.dealer-seat span');
+    const dealerSub = document.querySelector('.dealer-seat div span');
+
+    if (table) {
+        const anyoneBlind = state.seats.some(s => s.isBlind) && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER';
+        table.classList.toggle('blind-aura', anyoneBlind);
+
+        if (state.statusText && state.statusText.includes('PORĄ')) {
+            table.classList.add('marriage-aura');
+            setTimeout(() => table.classList.remove('marriage-aura'), 2200);
+        }
+    }
+
+    // Statinės (900) ugninis efektas žaidėjų dėžutėms
+    const myIdx = state.mySeatIndex;
+    const leftIdx = (myIdx + 1) % 3;
+    const rightIdx = (myIdx + 2) % 3;
+
+    const meBox = document.getElementById('box-me');
+    const leftBox = document.getElementById('box-left');
+    const rightBox = document.getElementById('box-right');
+
+    if (meBox) meBox.classList.toggle('on-barrel', state.seats.at(myIdx).totalScore >= 900);
+    if (leftBox) leftBox.classList.toggle('on-barrel', state.seats.at(leftIdx).totalScore >= 900);
+    if (rightBox) rightBox.classList.toggle('on-barrel', state.seats.at(rightIdx).totalScore >= 900);
+
+    // Krupjė gyvos emocijos
+    if (dealerEmoji && dealerSub && state.statusText) {
+        if (state.statusText.includes('SUDEGĖ')) {
+            dealerEmoji.innerText = '😱';
+            dealerSub.innerText = 'Oho, sudegė!';
+        } else if (state.statusText.includes('PORĄ')) {
+            dealerEmoji.innerText = '🥳';
+            dealerSub.innerText = 'Karališka pora!';
+        } else if (state.statusText.includes('AKLAI') || state.seats.some(s => s.isBlind)) {
+            dealerEmoji.innerText = '😎';
+            dealerSub.innerText = 'Drąsus ėjimas!';
+        } else if (state.phase === 'GAME_OVER') {
+            dealerEmoji.innerText = '🏆';
+            dealerSub.innerText = 'Sveikinimai!';
+        } else {
+            dealerEmoji.innerText = '🤵';
+            dealerSub.innerText = 'Prižiūri stalą';
+        }
+    }
+
+    // Kirčio kortų nuskriejimas į laimėtojo pusę
+    if (state.trickCards && state.trickCards.length === 3 && state.statusText && state.statusText.includes('Kirtį paėmė')) {
+        const winnerName = state.seats.find(s => state.statusText.includes(s.name));
+        if (winnerName) {
+            let flyClass = 'trick-fly-me';
+            if (winnerName.index === leftIdx) flyClass = 'trick-fly-left';
+            else if (winnerName.index === rightIdx) flyClass = 'trick-fly-right';
+
+            setTimeout(() => {
+                const tableCardsEl = document.getElementById('tableCards');
+                if (tableCardsEl) tableCardsEl.classList.add(flyClass);
+            }, 750);
+        }
+    } else {
+        const tableCardsEl = document.getElementById('tableCards');
+        if (tableCardsEl) {
+            tableCardsEl.classList.remove('trick-fly-me', 'trick-fly-left', 'trick-fly-right');
+        }
+    }
+});
 // PABAIGA
+
 
 

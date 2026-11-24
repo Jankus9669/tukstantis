@@ -516,37 +516,72 @@ function renderTableCenter(state, leftIdx, rightIdx) {
 }
 function renderMyCards(state) {
     const container = document.getElementById('playerCards');
+    const tableEl = document.querySelector('.poker-table');
     container.innerHTML = '';
 
+    // Pašaliname seną užverstų kortų krūvelę ant stalo, jei ji buvo
+    const oldTableHand = document.getElementById('myTableFaceDownHand');
+    if (oldTableHand) oldTableHand.remove();
+
+    // Jei kortos dar užverstos (ne LOBBY fazėje) – padedame jas ant stalo prieš žaidėją
+    if (!state.myCardsRevealed && state.myHand && state.myHand.length > 0 && state.phase !== 'LOBBY') {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'color:#94a3b8; font-size:13px; padding:12px; font-style:italic;';
+        hint.innerText = '🂠 Tavo užverstos kortos guli ant stalo...';
+        container.appendChild(hint);
+
+        if (tableEl) {
+            const tablePile = document.createElement('div');
+            tablePile.id = 'myTableFaceDownHand';
+            tablePile.title = 'Paspausk, kad paimtum kortas į rankas';
+            tablePile.style.cssText = 'position:absolute; bottom:14px; left:50%; transform:translateX(-50%); display:flex; justify-content:center; z-index:15; cursor:pointer;';
+
+            state.myHand.forEach((_, idx) => {
+                const div = document.createElement('div');
+                div.className = 'card small hidden';
+                const angle = (idx - 3) * 4;
+                div.style.cssText = 'margin-left:' + (idx === 0 ? '0' : '-18px') + '; transform:rotate(' + angle + 'deg); box-shadow:0 4px 10px rgba(0,0,0,0.7); transition:transform 0.2s;';
+                tablePile.appendChild(div);
+            });
+
+            // Leidžiame atversti ir paspaudus tiesiai ant kortų ant stalo (kai ateina eilė)
+            tablePile.addEventListener('click', () => {
+                if (state.phase === 'BIDDING' && state.currentTurnIndex === state.mySeatIndex) {
+                    playSound('card');
+                    socket.emit('revealCards', currentRoomCode);
+                }
+            });
+
+            tableEl.appendChild(tablePile);
+        }
+        return;
+    }
+
+    // Kai kortos atverstos – jos paimtos į rankas
     const isMyTurn = (state.currentTurnIndex === state.mySeatIndex);
     const canClick = (state.phase === 'DISCARD_3' && isMyTurn) || (state.phase === 'PLAYING' && isMyTurn);
 
     let indexedHand = state.myHand.map((card, originalIndex) => ({ card, originalIndex }));
-    if (state.myCardsRevealed) {
-        indexedHand.sort((a, b) => a.card.suit.localeCompare(b.card.suit) || b.card.power - a.card.power);
-    }
+    indexedHand.sort((a, b) => a.card.suit.localeCompare(b.card.suit) || b.card.power - a.card.power);
 
     indexedHand.forEach(item => {
         const div = document.createElement('div');
-        if (state.myCardsRevealed) {
-            div.className = 'card ' + (item.card.isRed ? 'red' : '') + (canClick ? ' clickable' : '');
-            div.innerHTML = '<div>' + item.card.name + '</div><div>' + item.card.suit + '</div>';
-            if (canClick) {
-                div.addEventListener('click', () => {
-                    if (state.phase === 'DISCARD_3') {
-                        playSound('card');
-                        socket.emit('discardCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
-                    } else if (state.phase === 'PLAYING') {
-                        socket.emit('playCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
-                    }
-                });
-            }
-        } else {
-            div.className = 'card hidden';
+        div.className = 'card ' + (item.card.isRed ? 'red' : '') + (canClick ? ' clickable' : '');
+        div.innerHTML = '<div>' + item.card.name + '</div><div>' + item.card.suit + '</div>';
+        if (canClick) {
+            div.addEventListener('click', () => {
+                if (state.phase === 'DISCARD_3') {
+                    playSound('card');
+                    socket.emit('discardCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
+                } else if (state.phase === 'PLAYING') {
+                    socket.emit('playCard', { roomCode: currentRoomCode, cardIndex: item.originalIndex });
+                }
+            });
         }
         container.appendChild(div);
     });
 }
+
 
 function renderDiscarded(state) {
     const info = document.getElementById('discardInfo');

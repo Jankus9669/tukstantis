@@ -176,13 +176,15 @@ function broadcastState(roomCode) {
                 usedNineGuess: !!s.usedNineGuess
             }));
 
-            let guessInfo = null;
+                        let guessInfo = null;
             if (room.nineGuess) {
                 guessInfo = {
                     giverIndex: room.nineGuess.giverIndex,
-                    hasGuessed: !!room.nineGuess.guesses[seatIdx]
+                    hasGuessed: !!room.nineGuess.guesses[seatIdx],
+                    availableSuits: room.nineGuess.availableSuits || ['♣', '♠', '♥', '♦']
                 };
             }
+
 
             io.to(seat.socketId).emit('gameState', {
                 roomCode: room.code,
@@ -637,19 +639,19 @@ io.on('connection', (socket) => {
         const nines = giver.hand.filter(c => c.name === '9');
         if (nines.length !== 3 || giver.usedNineGuess || !nines.some(c => c.suit === suit)) return;
 
+                const availableSuits = nines.map(c => c.suit);
         giver.usedNineGuess = true;
-        room.nineGuess = { giverIndex: seatIdx, targetSuit: suit, prevPhase: room.phase, guesses: {} };
+        room.nineGuess = { giverIndex: seatIdx, targetSuit: suit, availableSuits: availableSuits, prevPhase: room.phase, guesses: {} };
         room.phase = 'NINE_GUESS';
-        room.statusText = '🔮 ' + giver.name + ' turi TRIS DEVYNAKES ir siūlo atspėti vienos iš jų rūšį! Kiti žaidėjai renkasi...';
+        room.statusText = '🔮 ' + giver.name + ' turi TRIS DEVYNAKES (' + availableSuits.join(', ') + ') ir siūlo atspėti vieną iš jų!';
         broadcastState(roomCode);
 
         room.seats.forEach((s, idx) => {
-            if (idx !== seatIdx && s.isBot) room.nineGuess.guesses[idx] = suits.at(Math.floor(Math.random() * suits.length));
+            if (idx !== seatIdx && s.isBot) {
+                room.nineGuess.guesses[idx] = availableSuits[Math.floor(Math.random() * availableSuits.length)];
+            }
         });
-        if (room.seats.filter((s, idx) => idx !== seatIdx && !s.isBot).length === 0) {
-            setTimeout(() => evaluateNineGuess(roomCode), 1500);
-        }
-    });
+
 
     socket.on('submitNineGuess', ({ roomCode, suit }) => {
         const room = rooms[roomCode];

@@ -353,16 +353,15 @@ function renderControls(state) {
             info.style.cssText = 'color:#10b981; font-weight:bold; padding:8px;';
             info.innerText = '✅ Tavo spėjimas užfiksuotas! Laukiame kito žaidėjo...';
             area.appendChild(info);
-        } else {
-            ['♣', '♠', '♥', '♦'].forEach(s => {
+                } else {
+            (state.nineGuess.availableSuits || ['♣', '♠', '♥', '♦']).forEach(s => {
                 addButton('Spėju: 9' + s + ' (' + getSuitPointsLabel(s) + ')', '', () => {
                     playSound('bid');
                     socket.emit('submitNineGuess', { roomCode: currentRoomCode, suit: s });
                 });
             });
         }
-        return;
-    }
+
 
     const isMyTurn = (state.currentTurnIndex === state.mySeatIndex);
     const amIHighestBidder = (state.highestBidderIndex === state.mySeatIndex);

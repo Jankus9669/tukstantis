@@ -371,18 +371,25 @@ socket.on('gameState', (state) => {
     setTxt('myRoundScore', me.roundScore);
 
 
-    // Aktyvaus ėjimo ir 900 statinės paryškinimas
+        // Aktyvaus ėjimo ir 900 statinės paryškinimas
     const myBox = document.getElementById('myPlayerBox');
     const leftBox = document.getElementById('leftPlayerBox');
     const rightBox = document.getElementById('rightPlayerBox');
 
-    myBox.classList.toggle('active-turn', state.currentTurnIndex === myIdx && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER' && state.phase !== 'GAME_OVER');
-    leftBox.classList.toggle('active-turn', state.currentTurnIndex === leftIdx && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER' && state.phase !== 'GAME_OVER');
-    rightBox.classList.toggle('active-turn', state.currentTurnIndex === rightIdx && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER' && state.phase !== 'GAME_OVER');
+    const isPlayPhase = (state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER' && state.phase !== 'GAME_OVER');
+    if (myBox) {
+        myBox.classList.toggle('active-turn', state.currentTurnIndex === myIdx && isPlayPhase);
+        myBox.classList.toggle('on-barrel', me.totalScore >= 900);
+    }
+    if (leftBox) {
+        leftBox.classList.toggle('active-turn', state.currentTurnIndex === leftIdx && isPlayPhase);
+        leftBox.classList.toggle('on-barrel', left.totalScore >= 900);
+    }
+    if (rightBox) {
+        rightBox.classList.toggle('active-turn', state.currentTurnIndex === rightIdx && isPlayPhase);
+        rightBox.classList.toggle('on-barrel', right.totalScore >= 900);
+    }
 
-    myBox.classList.toggle('on-barrel', me.totalScore >= 900);
-    leftBox.classList.toggle('on-barrel', left.totalScore >= 900);
-    rightBox.classList.toggle('on-barrel', right.totalScore >= 900);
 
     // 4D Stalo auros ir gyvas Krupjė
     const table = document.querySelector('.poker-table');

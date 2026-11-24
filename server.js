@@ -629,10 +629,7 @@ io.on('connection', (socket) => {
         room.statusText = infoMsg;
         broadcastState(roomCode);
     });
-        if (room.seats.filter((s, idx) => idx !== seatIdx && !s.isBot).length === 0) {
-            setTimeout(() => evaluateNineGuess(roomCode), 1500);
-        }
-    });
+        
 
     socket.on('startNineGuess', ({ roomCode, suit }) => {
         const room = rooms[roomCode];
@@ -655,7 +652,11 @@ io.on('connection', (socket) => {
                 room.nineGuess.guesses[idx] = availableSuits[Math.floor(Math.random() * availableSuits.length)];
             }
         });
-
+        
+if (room.seats.filter((s, idx) => idx !== seatIdx && !s.isBot).length === 0) {
+            setTimeout(() => evaluateNineGuess(roomCode), 1500);
+        }
+    });
 
     socket.on('submitNineGuess', ({ roomCode, suit }) => {
         const room = rooms[roomCode];

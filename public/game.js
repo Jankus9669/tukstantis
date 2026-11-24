@@ -775,6 +775,106 @@ document.addEventListener('pointerdown', (e) => {
         else if (e.target.closest('button')) navigator.vibrate(15);
     }
 });
+
+// --- 10D VIZUALIZACIJA: HOLOGRAMOS, KOMETOS, ŽAIBAI IR SMŪGIO BANGOS ---
+const style10D = document.createElement('style');
+style10D.innerHTML = `
+@keyframes holoShift {
+    0% { filter: hue-rotate(0deg) brightness(1.05); }
+    50% { filter: hue-rotate(45deg) brightness(1.15); }
+    100% { filter: hue-rotate(0deg) brightness(1.05); }
+}
+.card.holo-card {
+    border: 2px solid #f59e0b !important;
+    box-shadow: 0 0 18px rgba(251, 191, 36, 0.75), inset 0 0 12px rgba(253, 224, 71, 0.5) !important;
+    animation: holoShift 3s infinite ease-in-out;
+}
+@keyframes shockwave10D {
+    0% { transform: translate(-50%, -50%) scale(0.1); opacity: 1; border-width: 6px; }
+    100% { transform: translate(-50%, -50%) scale(4.5); opacity: 0; border-width: 1px; }
+}
+.table-shockwave {
+    position: absolute; top: 50%; left: 50%; width: 120px; height: 120px;
+    border: 6px solid #fbbf24; border-radius: 50%; pointer-events: none; z-index: 50;
+    animation: shockwave10D 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes laserSpin {
+    0% { box-shadow: 0 0 15px #fbbf24, inset 0 0 10px #fbbf24; }
+    50% { box-shadow: 0 0 32px #34d399, inset 0 0 18px #34d399; }
+    100% { box-shadow: 0 0 15px #fbbf24, inset 0 0 10px #fbbf24; }
+}
+.active-turn {
+    animation: laserSpin 1.4s infinite ease-in-out !important;
+}
+@keyframes coinFall10D {
+    0% { transform: translateY(-20px) rotateY(0deg) scale(0.8); opacity: 1; }
+    100% { transform: translateY(340px) rotateY(720deg) scale(1.1); opacity: 0; }
+}
+.gold-coin-10d {
+    position: absolute; font-size: 20px; pointer-events: none; z-index: 60;
+    text-shadow: 0 0 10px #fbbf24;
+}
+`;
+document.head.appendChild(style10D);
+
+function triggerTableShockwave(color) {
+    const table = document.querySelector('.poker-table');
+    if (!table) return;
+    const wave = document.createElement('div');
+    wave.className = 'table-shockwave';
+    if (color) wave.style.borderColor = color;
+    table.appendChild(wave);
+    setTimeout(() => wave.remove(), 850);
+}
+
+function triggerGoldRain10D() {
+    const table = document.querySelector('.poker-table');
+    if (!table) return;
+    const icons = ['👑', '✨', '🪙', '💎'];
+    for (let i = 0; i < 24; i++) {
+        const coin = document.createElement('div');
+        coin.className = 'gold-coin-10d';
+        coin.innerText = icons[Math.floor(Math.random() * icons.length)];
+        coin.style.left = (Math.random() * 84 + 8) + '%';
+        coin.style.top = '0px';
+        const dur = Math.random() * 1000 + 1200;
+        coin.style.animation = 'coinFall10D ' + dur + 'ms ease-in forwards';
+        table.appendChild(coin);
+        setTimeout(() => coin.remove(), dur);
+    }
+}
+
+// Pridedame holografinį spindesį Tūzams (A) ir Dešimtakėms (10)
+setInterval(() => {
+    document.querySelectorAll('#playerCards .card:not(.hidden)').forEach(card => {
+        const txt = card.innerText || '';
+        if (txt.startsWith('A') || txt.startsWith('10')) {
+            card.classList.add('holo-card');
+        }
+    });
+}, 500);
+
+// Reaguojame į įvykius ant stalo 10D bangomis ir aukso lietumi
+let lastStatus10D = '';
+socket.on('gameState', (state) => {
+    if (state.statusText && state.statusText !== lastStatus10D) {
+        lastStatus10D = state.statusText;
+        if (state.statusText.includes('PORĄ')) {
+            triggerTableShockwave('#fbbf24');
+            triggerGoldRain10D();
+            if (navigator.vibrate) try { navigator.vibrate([40, 30, 80]); } catch (e) {}
+        } else if (state.statusText.includes('Kirtį paėmė')) {
+            const match = state.statusText.match(/\+(\d+)/);
+            const pts = match ? Number(match[1]) : 0;
+            if (pts >= 20) {
+                triggerTableShockwave('#10b981');
+                if (navigator.vibrate) try { navigator.vibrate(50); } catch (e) {}
+            } else {
+                triggerTableShockwave('rgba(255,255,255,0.45)');
+            }
+        }
+    }
+});
 // PABAIGA
 
 

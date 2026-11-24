@@ -871,10 +871,11 @@ socket.on('gameState', (state) => {
                 if (navigator.vibrate) try { navigator.vibrate(50); } catch (e) {}
             } else {
                 triggerTableShockwave('rgba(255,255,255,0.45)');
-            }
+          
         }
     }
 });
+}
 // PABAIGA
 
 

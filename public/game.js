@@ -189,34 +189,55 @@ socket.on('connect', () => {
 });
 
 // --- VIRŠUTINIAI VALDYMO MYGTUKAI ---
-document.getElementById('copyCodeBtn').addEventListener('click', () => {
-    if (!currentRoomCode) return;
-    navigator.clipboard.writeText(currentRoomCode);
-    const btn = document.getElementById('copyCodeBtn');
-    btn.innerText = '✅ Nukopijuota!';
-    setTimeout(() => btn.innerText = '📋 Kopijuoti', 1800);
-});
+const copyBtn = document.getElementById('copyCodeBtn');
+if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+        if (!currentRoomCode) return;
+        navigator.clipboard.writeText(currentRoomCode);
+        copyBtn.innerText = '✅ Nukopijuota!';
+        setTimeout(() => copyBtn.innerText = '📋 Kopijuoti', 1800);
+    });
+}
 
-document.getElementById('soundToggleBtn').addEventListener('click', () => {
-    soundEnabled = !soundEnabled;
-    document.getElementById('soundToggleBtn').innerText = soundEnabled ? '🔊' : '🔇';
-});
+const soundBtn = document.getElementById('soundToggleBtn');
+if (soundBtn) {
+    soundBtn.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        soundBtn.innerText = soundEnabled ? '🔊' : '🔇';
+    });
+}
 
-document.getElementById('rulesBtn').addEventListener('click', () => {
-    document.getElementById('rulesModal').style.display = 'flex';
-});
-document.getElementById('closeRulesBtn').addEventListener('click', () => {
-    document.getElementById('rulesModal').style.display = 'none';
-});
+const rulesBtn = document.getElementById('rulesBtn');
+if (rulesBtn) {
+    rulesBtn.addEventListener('click', () => {
+        const modal = document.getElementById('rulesModal');
+        if (modal) modal.style.display = 'flex';
+    });
+}
 
-document.getElementById('leaveRoomBtn').addEventListener('click', () => {
-    clearSession();
-    location.reload();
-});
+const closeRulesBtn = document.getElementById('closeRulesBtn');
+if (closeRulesBtn) {
+    closeRulesBtn.addEventListener('click', () => {
+        const modal = document.getElementById('rulesModal');
+        if (modal) modal.style.display = 'none';
+    });
+}
 
-document.getElementById('addBotBtn').addEventListener('click', () => {
-    if (currentRoomCode) socket.emit('addBot', currentRoomCode);
-});
+const leaveBtn = document.getElementById('leaveRoomBtn');
+if (leaveBtn) {
+    leaveBtn.addEventListener('click', () => {
+        clearSession();
+        location.reload();
+    });
+}
+
+const addBotBtn = document.getElementById('addBotBtn');
+if (addBotBtn) {
+    addBotBtn.addEventListener('click', () => {
+        if (currentRoomCode) socket.emit('addBot', currentRoomCode);
+    });
+}
+
 
 // --- POKALBIŲ LANGAS ---
 function sendChatMessage(textToSend) {

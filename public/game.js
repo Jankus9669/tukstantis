@@ -316,12 +316,15 @@ socket.on('gameState', (state) => {
         }
     }
 
-    document.getElementById('statusBanner').innerText = state.statusText;
-    document.getElementById('currentBidDisplay').innerText = state.currentBid;
-    document.getElementById('trumpDisplay').innerText = state.trumpSuit || 'Nėra';
+    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+
+    setTxt('statusBanner', state.statusText);
+    setTxt('currentBidDisplay', state.currentBid);
+    setTxt('trumpDisplay', state.trumpSuit || 'Nėra');
 
     const emptySeats = state.seats.filter(s => s.isEmpty).length;
-    document.getElementById('addBotBtn').style.display = (state.phase === 'LOBBY' && emptySeats > 0) ? 'inline-block' : 'none';
+    const addBotEl = document.getElementById('addBotBtn');
+    if (addBotEl) addBotEl.style.display = (state.phase === 'LOBBY' && emptySeats > 0) ? 'inline-block' : 'none';
 
     const myIdx = state.mySeatIndex;
     const leftIdx = (myIdx + 1) % 3;
@@ -332,36 +335,41 @@ socket.on('gameState', (state) => {
     const right = state.seats[rightIdx];
 
     // Viršutiniai priešininkai
-    document.getElementById('leftPlayerName').innerText = left.avatar + ' ' + left.name;
-    document.getElementById('leftTotalScore').innerText = left.totalScore + ' / 1000' + (left.totalScore >= 900 ? ' 🛢️' : '');
-    document.getElementById('leftRoundScore').innerText = left.roundScore;
-    document.getElementById('leftBidStatus').innerText = left.bidStatus;
+    setTxt('leftPlayerName', left.avatar + ' ' + left.name);
+    setTxt('leftTotalScore', left.totalScore + ' / 1000' + (left.totalScore >= 900 ? ' 🛢️' : ''));
+    setTxt('leftRoundScore', left.roundScore);
+    setTxt('leftBidStatus', left.bidStatus);
 
     const leftCardsDiv = document.getElementById('leftPlayerCards');
-    leftCardsDiv.innerHTML = '';
-    for (let i = 0; i < left.handCount; i++) {
-        const c = document.createElement('div');
-        c.className = 'card small hidden';
-        leftCardsDiv.appendChild(c);
+    if (leftCardsDiv) {
+        leftCardsDiv.innerHTML = '';
+        for (let i = 0; i < left.handCount; i++) {
+            const c = document.createElement('div');
+            c.className = 'card small hidden';
+            leftCardsDiv.appendChild(c);
+        }
     }
 
-    document.getElementById('rightPlayerName').innerText = right.avatar + ' ' + right.name;
-    document.getElementById('rightTotalScore').innerText = right.totalScore + ' / 1000' + (right.totalScore >= 900 ? ' 🛢️' : '');
-    document.getElementById('rightRoundScore').innerText = right.roundScore;
-    document.getElementById('rightBidStatus').innerText = right.bidStatus;
+    setTxt('rightPlayerName', right.avatar + ' ' + right.name);
+    setTxt('rightTotalScore', right.totalScore + ' / 1000' + (right.totalScore >= 900 ? ' 🛢️' : ''));
+    setTxt('rightRoundScore', right.roundScore);
+    setTxt('rightBidStatus', right.bidStatus);
 
     const rightCardsDiv = document.getElementById('rightPlayerCards');
-    rightCardsDiv.innerHTML = '';
-    for (let i = 0; i < right.handCount; i++) {
-        const c = document.createElement('div');
-        c.className = 'card small hidden';
-        rightCardsDiv.appendChild(c);
+    if (rightCardsDiv) {
+        rightCardsDiv.innerHTML = '';
+        for (let i = 0; i < right.handCount; i++) {
+            const c = document.createElement('div');
+            c.className = 'card small hidden';
+            rightCardsDiv.appendChild(c);
+        }
     }
 
     // Mano duomenys
-    document.getElementById('myName').innerText = me.avatar + ' ' + me.name + (me.isBlind ? ' 🙈 [Aklai x2]' : '');
-    document.getElementById('myTotalScore').innerText = me.totalScore + ' / 1000' + (me.totalScore >= 900 ? ' 🛢️' : '');
-    document.getElementById('myRoundScore').innerText = me.roundScore;
+    setTxt('myName', me.avatar + ' ' + me.name + (me.isBlind ? ' 🙈 [Aklai x2]' : ''));
+    setTxt('myTotalScore', me.totalScore + ' / 1000' + (me.totalScore >= 900 ? ' 🛢️' : ''));
+    setTxt('myRoundScore', me.roundScore);
+
 
     // Aktyvaus ėjimo ir 900 statinės paryškinimas
     const myBox = document.getElementById('myPlayerBox');

@@ -8,14 +8,13 @@ if (!myPlayerId) {
 
 let lastState = null;
 let choosingNineToHide = false;
-let soundEnabled = true;
+let selectedAvatar = '👨';
 
 // --- GARSŲ SISTEMA (Web Audio API) ---
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
 function playSound(type) {
-    if (!soundEnabled) return;
     try {
         if (!audioCtx) audioCtx = new AudioCtx();
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -86,17 +85,17 @@ function playSound(type) {
     } catch (e) {}
 }
 
-// --- VIZUALINIAI EFEKTAI (SUDEGIMAS IR KONFETI) ---
+// --- VIZUALINIAI EFEKTAI ---
+const extraStyles = document.createElement('style');
+extraStyles.innerHTML = '@keyframes burnFlash { 0%, 100% { box-shadow: inset 0 0 0 rgba(239,68,68,0); } 40% { box-shadow: inset 0 0 90px rgba(239,68,68,0.85); } } body.burn-effect { animation: burnFlash 1.2s ease-out; } .player-box.on-barrel, .player-seat.on-barrel { border-color: #ef4444 !important; box-shadow: 0 0 20px rgba(239,68,68,0.8) !important; } .poker-table.blind-aura { box-shadow: inset 0 0 80px rgba(168,85,247,0.65), 0 20px 50px rgba(0,0,0,0.9), 0 0 0 3px #a855f7 !important; } .poker-table.marriage-aura { box-shadow: inset 0 0 90px rgba(251,191,36,0.75), 0 20px 50px rgba(0,0,0,0.9), 0 0 0 4px #fbbf24 !important; } @keyframes confettiDrop { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(105vh) rotate(720deg); opacity: 0; } } .confetti-piece { position: fixed; top: 0; width: 10px; height: 14px; z-index: 9999; pointer-events: none; animation: confettiDrop 3s linear forwards; }';
+document.head.appendChild(extraStyles);
+
 function triggerBurnAnimation() {
     document.body.classList.remove('burn-effect');
     void document.body.offsetWidth;
     document.body.classList.add('burn-effect');
-    setTimeout(() => {
-        document.body.classList.remove('burn-effect');
-    }, 1200);
-    try {
-        if (navigator.vibrate) navigator.vibrate();
-    } catch (e) {}
+    setTimeout(() => document.body.classList.remove('burn-effect'), 1200);
+    try { if (navigator.vibrate) navigator.vibrate(); } catch (e) {}
 }
 
 function triggerConfetti() {
@@ -113,17 +112,11 @@ function triggerConfetti() {
     }
 }
 
-// --- PAGALBINĖS FUNKCIJOS ---
-function getSelectedAvatar() {
-    const active = document.querySelector('#avatarPicker .avatar-opt.selected');
-    return active ? active.getAttribute('data-avatar') : '😎';
-}
-
 function getSuitPointsLabel(suit) {
-    if (suit === '♥') return '100 tšk.';
-    if (suit === '♦') return '80 tšk.';
-    if (suit === '♣') return '60 tšk.';
-    if (suit === '♠') return '40 tšk.';
+    if (suit === '♣') return '100 tšk.';
+    if (suit === '♠') return '80 tšk.';
+    if (suit === '♥') return '60 tšk.';
+    if (suit === '♦') return '40 tšk.';
     return '';
 }
 
@@ -135,58 +128,49 @@ function clearSession() {
     localStorage.removeItem('tukstantis_session');
 }
 
-// --- PRISIJUNGIMAS IR KAMBARIAI ---
-document.querySelectorAll('#avatarPicker .avatar-opt').forEach(el => {
-    el.addEventListener('click', () => {
-        document.querySelectorAll('#avatarPicker .avatar-opt').forEach(x => x.classList.remove('selected'));
-        el.classList.add('selected');
+// --- PRISIJUNGIMAS IR AVATARAI ---
+const maleBtn = document.getElementById('lobbyMale');
+const femaleBtn = document.getElementById('lobbyFemale');
+if (maleBtn && femaleBtn) {
+    maleBtn.addEventListener('click', () => {
+        selectedAvatar = '👨';
+        maleBtn.classList.add('active-avatar');
+        femaleBtn.classList.remove('active-avatar');
     });
+    femaleBtn.addEventListener('click', () => {
+        selectedAvatar = '👩';
+        femaleBtn.classList.add('active-avatar');
+        maleBtn.classList.remove('active-avatar');
+    });
+}
+
+document.getElementById('createRoomBtn').addEventListener('click', () => {
+    const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
+    socket.emit('createRoom', { playerName: name, avatar: selectedAvatar, playerId: myPlayerId });
 });
 
-const createBtn = document.getElementById('createRoomBtn');
-if (createBtn) {
-    createBtn.addEventListener('click', () => {
-        const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
-        const avatar = getSelectedAvatar();
-        socket.emit('createRoom', { playerName: name, avatar, playerId: myPlayerId });
-    });
-}
-
-const joinBtn = document.getElementById('joinRoomBtn');
-if (joinBtn) {
-    joinBtn.addEventListener('click', () => {
-        const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
-        const avatar = getSelectedAvatar();
-        const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-        if (!code) {
-            const errEl = document.getElementById('lobbyError');
-            if (errEl) errEl.innerText = 'Įvesk kambario kodą!';
-            return;
-        }
-        socket.emit('joinRoom', { roomCode: code, playerName: name, avatar, playerId: myPlayerId });
-    });
-}
+document.getElementById('joinRoomBtn').addEventListener('click', () => {
+    const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
+    const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+    if (!code) {
+        alert('Įvesk kambario kodą!');
+        return;
+    }
+    socket.emit('joinRoom', { roomCode: code, playerName: name, avatar: selectedAvatar, playerId: myPlayerId });
+});
 
 socket.on('roomJoined', ({ roomCode }) => {
     currentRoomCode = roomCode;
     const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
-    const avatar = getSelectedAvatar();
-    saveSession(roomCode, name, avatar);
+    saveSession(roomCode, name, selectedAvatar);
 
-    const lobbyEl = document.getElementById('lobbyScreen');
-    const gameEl = document.getElementById('gameScreen');
-    const codeEl = document.getElementById('roomCodeDisplay');
-    const errEl = document.getElementById('lobbyError');
-
-    if (lobbyEl) lobbyEl.style.display = 'none';
-    if (gameEl) gameEl.style.display = 'flex';
-    if (codeEl) codeEl.innerText = roomCode;
-    if (errEl) errEl.innerText = '';
+    document.getElementById('lobbyScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'flex';
+    document.getElementById('displayRoomCode').innerText = roomCode;
 });
 
 socket.on('errorMsg', (msg) => {
-    const errEl = document.getElementById('lobbyError');
-    if (errEl) errEl.innerText = msg;
+    alert(msg);
     if (msg.includes('neegzistuoja')) clearSession();
 });
 
@@ -202,90 +186,35 @@ socket.on('connect', () => {
     }
 });
 
-// --- VIRŠUTINIAI VALDYMO MYGTUKAI ---
-const copyBtn = document.getElementById('copyCodeBtn');
-if (copyBtn) {
-    copyBtn.addEventListener('click', () => {
-        if (!currentRoomCode) return;
-        navigator.clipboard.writeText(currentRoomCode);
-        copyBtn.innerText = '✅ Nukopijuota!';
-        setTimeout(() => copyBtn.innerText = '📋 Kopijuoti', 1800);
-    });
-}
-
-const soundBtn = document.getElementById('soundToggleBtn');
-if (soundBtn) {
-    soundBtn.addEventListener('click', () => {
-        soundEnabled = !soundEnabled;
-        soundBtn.innerText = soundEnabled ? '🔊' : '🔇';
-    });
-}
-
-const rulesBtn = document.getElementById('rulesBtn');
-if (rulesBtn) {
-    rulesBtn.addEventListener('click', () => {
-        const modal = document.getElementById('rulesModal');
-        if (modal) modal.style.display = 'flex';
-    });
-}
-
-const closeRulesBtn = document.getElementById('closeRulesBtn');
-if (closeRulesBtn) {
-    closeRulesBtn.addEventListener('click', () => {
-        const modal = document.getElementById('rulesModal');
-        if (modal) modal.style.display = 'none';
-    });
-}
-
-const leaveBtn = document.getElementById('leaveRoomBtn');
-if (leaveBtn) {
-    leaveBtn.addEventListener('click', () => {
-        clearSession();
-        location.reload();
-    });
-}
-
-const addBotBtn = document.getElementById('addBotBtn');
-if (addBotBtn) {
-    addBotBtn.addEventListener('click', () => {
-        if (currentRoomCode) socket.emit('addBot', currentRoomCode);
-    });
-}
-
 // --- POKALBIŲ LANGAS ---
 function sendChatMessage(textToSend) {
     if (!currentRoomCode) return;
     const input = document.getElementById('chatInput');
-    const msg = textToSend || (input ? input.value.trim() : '');
+    const msg = textToSend || input.value.trim();
     if (!msg) return;
     socket.emit('sendChat', { roomCode: currentRoomCode, message: msg });
-    if (!textToSend && input) input.value = '';
+    if (!textToSend) input.value = '';
 }
 
-const chatBtn = document.getElementById('chatSendBtn');
-if (chatBtn) chatBtn.addEventListener('click', () => sendChatMessage());
-
-const chatInp = document.getElementById('chatInput');
-if (chatInp) {
-    chatInp.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendChatMessage();
-    });
-}
-
+document.getElementById('chatSendBtn').addEventListener('click', () => sendChatMessage());
+document.getElementById('chatInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendChatMessage();
+});
 document.querySelectorAll('.emoji-btn').forEach(btn => {
-btn.addEventListener('click', () => sendChatMessage(btn.getAttribute('data-emoji')));
+    btn.addEventListener('click', () => sendChatMessage(btn.getAttribute('data-emoji')));
 });
+
 socket.on('chatMessage', ({ sender, avatar, text }) => {
-playSound('chat');
-const box = document.getElementById('chatMessages');
-if (!box) return;
-const div = document.createElement('div');
-div.className = 'chat-msg';
-div.innerHTML = '' + avatar + ' ' + sender + ':' + text + '';
-box.appendChild(div);
-box.scrollTop = box.scrollHeight;
+    playSound('chat');
+    const box = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    div.innerHTML = '<div class="chat-sender">' + avatar + ' ' + sender + ':</div><div>' + text + '</div>';
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
 });
-// --- SAUSO SUTRIUŠKINIMO (0 KIRČIŲ PRIEŠININKAMS) EFEKTAS ---
+
+// --- SAUSO SUTRIUŠKINIMO EFEKTAS ---
 const sweepStyle = document.createElement('style');
 sweepStyle.innerHTML = '@keyframes sweepBannerPop { 0% { transform: translate(-50%, -50%) scale(0.3) rotate(-8deg); opacity: 0; } 20% { transform: translate(-50%, -50%) scale(1.12) rotate(2deg); opacity: 1; } 80% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.25); opacity: 0; } } .sweep-banner { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 45%, #fbbf24 100%); color: #fff; padding: 18px 28px; border-radius: 16px; border: 3px solid #fef08a; box-shadow: 0 0 40px rgba(251, 191, 36, 0.9), 0 15px 35px rgba(0, 0, 0, 0.85); z-index: 9999; text-align: center; pointer-events: none; animation: sweepBannerPop 3.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }';
 document.head.appendChild(sweepStyle);
@@ -305,9 +234,7 @@ playSound('win');
 socket.on('gameState', (state) => {
 const prevPhase = lastState ? lastState.phase : null;
 const prevTrickCount = lastState ? lastState.trickCards.length : 0;
-if (state.trickCards.length > prevTrickCount) {
-playSound('card');
-}
+if (state.trickCards.length > prevTrickCount) playSound('card');
 if (state.statusText && (!lastState || lastState.statusText !== state.statusText)) {
 if (state.statusText.includes('PORĄ')) playSound('marriage');
 if (state.statusText.includes('SAUSAS SUTRIUŠKINIMAS')) {
@@ -324,68 +251,51 @@ playSound('win');
 triggerConfetti();
 }
 }
-const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-setTxt('statusBanner', state.statusText);
-setTxt('currentBidDisplay', state.currentBid);
-setTxt('trumpDisplay', state.trumpSuit || 'Nėra');
-const emptySeats = state.seats.filter(s => s.isEmpty).length;
-const addBotEl = document.getElementById('addBotBtn');
-if (addBotEl) addBotEl.style.display = (state.phase === 'LOBBY' && emptySeats > 0) ? 'inline-block' : 'none';
+document.getElementById('statusText').innerText = state.statusText;
+const trumpBadge = document.getElementById('trumpBadge');
+if (state.trumpSuit) {
+trumpBadge.style.display = 'inline-block';
+trumpBadge.innerText = 'Koziris: ' + state.trumpSuit;
+} else {
+trumpBadge.style.display = 'none';
+}
 const myIdx = state.mySeatIndex;
 const leftIdx = (myIdx + 1) % 3;
 const rightIdx = (myIdx + 2) % 3;
 const me = state.seats[myIdx];
 const left = state.seats[leftIdx];
 const right = state.seats[rightIdx];
-// Viršutiniai priešininkai
-setTxt('leftPlayerName', left.avatar + ' ' + left.name);
-setTxt('leftTotalScore', left.totalScore + ' / 1000' + (left.totalScore >= 900 ? ' 🛢️' : ''));
-setTxt('leftRoundScore', left.roundScore);
-setTxt('leftBidStatus', left.bidStatus);
-const leftCardsDiv = document.getElementById('leftPlayerCards');
-if (leftCardsDiv) {
-leftCardsDiv.innerHTML = '';
-for (let i = 0; i < left.handCount; i++) {
-const c = document.createElement('div');
-c.className = 'card small hidden';
-leftCardsDiv.appendChild(c);
-}
-}
-setTxt('rightPlayerName', right.avatar + ' ' + right.name);
-setTxt('rightTotalScore', right.totalScore + ' / 1000' + (right.totalScore >= 900 ? ' 🛢️' : ''));
-setTxt('rightRoundScore', right.roundScore);
-setTxt('rightBidStatus', right.bidStatus);
-const rightCardsDiv = document.getElementById('rightPlayerCards');
-if (rightCardsDiv) {
-rightCardsDiv.innerHTML = '';
-for (let i = 0; i < right.handCount; i++) {
-const c = document.createElement('div');
-c.className = 'card small hidden';
-rightCardsDiv.appendChild(c);
-}
-}
+// Kairys priešininkas
+document.getElementById('leftAvatar').innerText = left.avatar;
+document.getElementById('leftName').innerText = left.name + (left.totalScore >= 900 ? ' 🛢️' : '');
+document.getElementById('leftTotal').innerText = left.totalScore;
+document.getElementById('leftRound').innerText = left.roundScore;
+document.getElementById('leftCount').innerText = left.handCount;
+document.getElementById('leftBid').innerText = left.bidStatus;
+// Dešinys priešininkas
+document.getElementById('rightAvatar').innerText = right.avatar;
+document.getElementById('rightName').innerText = right.name + (right.totalScore >= 900 ? ' 🛢️' : '');
+document.getElementById('rightTotal').innerText = right.totalScore;
+document.getElementById('rightRound').innerText = right.roundScore;
+document.getElementById('rightCount').innerText = right.handCount;
+document.getElementById('rightBid').innerText = right.bidStatus;
 // Mano duomenys
-setTxt('myName', me.avatar + ' ' + me.name + (me.isBlind ? ' 🙈 [Aklai x2]' : ''));
-setTxt('myTotalScore', me.totalScore + ' / 1000' + (me.totalScore >= 900 ? ' 🛢️' : ''));
-setTxt('myRoundScore', me.roundScore);
-// Aktyvaus ėjimo ir 900 statinės paryškinimas
-const myBox = document.getElementById('myPlayerBox');
-const leftBox = document.getElementById('leftPlayerBox');
-const rightBox = document.getElementById('rightPlayerBox');
+document.getElementById('meAvatar').innerText = me.avatar;
+const blindTag = me.isBlind ? ' 🙈 [Aklai x2]' : '';
+const barrelTag = me.totalScore >= 900 ? ' 🛢️' : '';
+document.getElementById('meHeader').innerText = me.name + blindTag + barrelTag + ' | Bendri: ' + me.totalScore + ' / 1000 | Partijoje: ' + me.roundScore;
+// Aktyvaus ėjimo ir statinės paryškinimas
 const isPlayPhase = (state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER' && state.phase !== 'GAME_OVER');
-if (myBox) {
-myBox.classList.toggle('active-turn', state.currentTurnIndex === myIdx && isPlayPhase);
-myBox.classList.toggle('on-barrel', me.totalScore >= 900);
-}
-if (leftBox) {
+const leftBox = document.getElementById('box-left');
+const rightBox = document.getElementById('box-right');
+const meBox = document.getElementById('box-me');
 leftBox.classList.toggle('active-turn', state.currentTurnIndex === leftIdx && isPlayPhase);
-leftBox.classList.toggle('on-barrel', left.totalScore >= 900);
-}
-if (rightBox) {
 rightBox.classList.toggle('active-turn', state.currentTurnIndex === rightIdx && isPlayPhase);
+meBox.classList.toggle('active-turn', state.currentTurnIndex === myIdx && isPlayPhase);
+leftBox.classList.toggle('on-barrel', left.totalScore >= 900);
 rightBox.classList.toggle('on-barrel', right.totalScore >= 900);
-}
-// 4D Stalo auros ir gyvas Krupjė
+meBox.classList.toggle('on-barrel', me.totalScore >= 900);
+// 4D Stalo auros ir Krupjė
 const table = document.querySelector('.poker-table');
 if (table) {
 const anyoneBlind = state.seats.some(s => s.isBlind) && state.phase !== 'LOBBY' && state.phase !== 'ROUND_OVER';
@@ -408,14 +318,13 @@ if (state.phase === 'BIDDING' || state.phase === 'LOBBY') {
 document.body.classList.remove('burn-effect');
 }
 renderControls(state);
-renderTableCenter(state, leftIdx, rightIdx);
+renderTableCenter(state);
 renderMyCards(state);
 renderDiscarded(state);
 lastState = state;
 });
 function renderControls(state) {
 const area = document.getElementById('controlsArea');
-if (!area) return;
 area.innerHTML = '';
 if (state.phase === 'NINE_GUESS' && state.nineGuess) {
 choosingNineToHide = false;
@@ -442,8 +351,12 @@ return;
 const isMyTurn = (state.currentTurnIndex === state.mySeatIndex);
 const amIHighestBidder = (state.highestBidderIndex === state.mySeatIndex);
 if (state.phase === 'LOBBY') {
+const emptySeats = state.seats.filter(s => s.isEmpty).length;
+if (emptySeats > 0) {
+addButton('🤖 Pridėti botą', '', () => socket.emit('addBot', currentRoomCode));
+}
 if (state.mySeatIndex === 0) {
-addButton('🚀 Pradėti žaidimą (tuščias vietas užims botai)', 'success', () => socket.emit('startGame', currentRoomCode));
+addButton('🚀 Pradėti žaidimą', 'success', () => socket.emit('startGame', currentRoomCode));
 }
 } else if (state.phase === 'BIDDING' && isMyTurn) {
 if (!state.myCardsRevealed) {
@@ -524,19 +437,21 @@ socket.emit('givePlus', currentRoomCode);
 }
 });
 }
+addButton('🚪 Išeiti', 'danger', () => {
+clearSession();
+location.reload();
+});
 }
-function renderTableCenter(state, leftIdx, rightIdx) {
+function renderTableCenter(state) {
 const title = document.getElementById('centerTitle');
 const container = document.getElementById('tableCards');
-if (!container) return;
 container.innerHTML = '';
-container.classList.remove('trick-fly-me', 'trick-fly-left', 'trick-fly-right');
 if (state.phase === 'LOBBY') {
-if (title) title.innerText = 'Laukia žaidėjų prisijungimo...';
+title.innerText = 'Laukia žaidėjų prisijungimo...';
 return;
 }
 if (state.talonCount > 0) {
-if (title) title.innerText = 'Bankas (3 kortos)';
+title.innerText = 'Bankas (3 kortos)';
 if (state.talon && state.talon.length > 0) {
 state.talon.forEach(c => {
 const div = document.createElement('div');
@@ -552,7 +467,7 @@ container.appendChild(div);
 }
 }
 } else if (state.trickCards.length > 0) {
-if (title) title.innerText = 'Kirtis ant stalo';
+title.innerText = 'Kirtis ant stalo';
 state.trickCards.forEach(item => {
 const seat = state.seats[item.seatIndex];
 const wrapper = document.createElement('div');
@@ -569,36 +484,26 @@ wrapper.appendChild(cardDiv);
 wrapper.appendChild(nameLabel);
 container.appendChild(wrapper);
 });
-if (state.trickCards.length === 3 && state.statusText && state.statusText.includes('Kirtį paėmė')) {
-const winnerSeat = state.seats.find(s => state.statusText.includes(s.name));
-if (winnerSeat) {
-let flyClass = 'trick-fly-me';
-if (winnerSeat.index === leftIdx) flyClass = 'trick-fly-left';
-else if (winnerSeat.index === rightIdx) flyClass = 'trick-fly-right';
-setTimeout(() => container.classList.add(flyClass), 750);
-}
-}
 } else {
-if (title) title.innerText = 'Stalas';
+title.innerText = 'Stalas';
 }
 }
 function renderMyCards(state) {
 const container = document.getElementById('playerCards');
 const tableEl = document.querySelector('.poker-table');
-if (!container) return;
 container.innerHTML = '';
 const oldTableHand = document.getElementById('myTableFaceDownHand');
 if (oldTableHand) oldTableHand.remove();
 if (!state.myCardsRevealed && state.myHand && state.myHand.length > 0 && state.phase !== 'LOBBY') {
 const hint = document.createElement('div');
 hint.style.cssText = 'color:#94a3b8; font-size:13px; padding:12px; font-style:italic;';
-hint.innerText = '🂠 Tavo užverstos kortos guli ant stalo...';
+hint.innerText = '🂠 Tavo užverstos kortos guli ant stalo (paspausk ant jų arba „Atversti kortas“)...';
 container.appendChild(hint);
 if (tableEl) {
 const tablePile = document.createElement('div');
 tablePile.id = 'myTableFaceDownHand';
 tablePile.title = 'Paspausk, kad paimtum kortas į rankas';
-tablePile.style.cssText = 'position:absolute; bottom:14px; left:50%; transform:translateX(-50%); display:flex; justify-content:center; z-index:15; cursor:pointer;';
+tablePile.style.cssText = 'position:absolute; bottom:115px; left:50%; transform:translateX(-50%); display:flex; justify-content:center; z-index:15; cursor:pointer;';
 state.myHand.forEach((_, idx) => {
 const div = document.createElement('div');
 div.className = 'card small hidden';
@@ -640,20 +545,17 @@ container.appendChild(div);
 function renderDiscarded(state) {
 const info = document.getElementById('discardInfo');
 const container = document.getElementById('discardedCards');
-if (!container) return;
 container.innerHTML = '';
 if (state.discardedCount === 0) {
-if (info) info.innerText = 'Kol kas nenusimesta';
+info.innerText = 'Kol kas nenusimesta';
 return;
 }
 const bidderName = state.seats[state.highestBidderIndex].name;
 const canUndo = (state.highestBidderIndex === state.mySeatIndex) && (state.phase === 'DISCARD_3' || state.phase === 'RAISE_BID');
 if (state.discardedPile.length > 0) {
-if (info) {
 info.innerText = canUndo
 ? 'Tavo nusimestos (+' + state.discardedPoints + ' tšk.) – paspausk, jei nori susigrąžinti:'
 : 'Tavo nusimestos (+' + state.discardedPoints + ' tšk.):';
-}
 state.discardedPile.forEach((c, idx) => {
 const div = document.createElement('div');
 div.className = 'card small ' + (c.isRed ? 'red' : '') + (canUndo ? ' clickable' : '');
@@ -668,7 +570,7 @@ socket.emit('undiscardCard', { roomCode: currentRoomCode, discardIndex: idx });
 container.appendChild(div);
 });
 } else {
-if (info) info.innerText = bidderName + ' nusimetė (+' + state.discardedPoints + ' tšk.)';
+info.innerText = bidderName + ' nusimetė (+' + state.discardedPoints + ' tšk.)';
 for (let i = 0; i < state.discardedCount; i++) {
 const div = document.createElement('div');
 div.className = 'card small hidden';
@@ -677,13 +579,11 @@ container.appendChild(div);
 }
 }
 function addButton(text, className, onClick) {
-const area = document.getElementById('controlsArea');
-if (!area) return;
 const btn = document.createElement('button');
 btn.innerText = text;
 if (className) btn.className = className;
 btn.addEventListener('click', onClick);
-area.appendChild(btn);
+document.getElementById('controlsArea').appendChild(btn);
 }
 // --- 4D STALO PERSPEKTYVA ---
 (function init4DTable() {
@@ -706,10 +606,10 @@ requestAnimationFrame(animateTable);
 }
 requestAnimationFrame(animateTable);
 })();
-// --- 5D VIZUALIZACIJA: DALELĖS, PROŽEKTORIUS, RATILAI IR HAPTIKA ---
-const style5D = document.createElement('style');
-style5D.innerHTML = '@keyframes floatDust { 0% { transform: translateY(0) scale(0.8); opacity: 0; } 30% { opacity: 0.75; } 100% { transform: translateY(-160px) scale(1.2); opacity: 0; } } .gold-dust { position: absolute; width: 4px; height: 4px; background: radial-gradient(circle, #fde68a 0%, #f59e0b 100%); border-radius: 50%; pointer-events: none; box-shadow: 0 0 8px #fbbf24; z-index: 2; } @keyframes rippleWave { 0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; } 100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; } } .touch-ripple { position: fixed; width: 40px; height: 40px; border: 2px solid #fbbf24; border-radius: 50%; pointer-events: none; z-index: 9998; animation: rippleWave 0.65s ease-out forwards; } .card.spotlight-card { background-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.65) 0%, transparent 60%), linear-gradient(145deg, #ffffff 0%, #fefce8 65%, #fef3c7 100%) !important; }';
-document.head.appendChild(style5D);
+// --- 5D IR 10D VIZUALIZACIJA ---
+const style10D = document.createElement('style');
+style10D.innerHTML = '@keyframes floatDust { 0% { transform: translateY(0) scale(0.8); opacity: 0; } 30% { opacity: 0.75; } 100% { transform: translateY(-160px) scale(1.2); opacity: 0; } } .gold-dust { position: absolute; width: 4px; height: 4px; background: radial-gradient(circle, #fde68a 0%, #f59e0b 100%); border-radius: 50%; pointer-events: none; box-shadow: 0 0 8px #fbbf24; z-index: 2; } @keyframes rippleWave { 0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; } 100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; } } .touch-ripple { position: fixed; width: 40px; height: 40px; border: 2px solid #fbbf24; border-radius: 50%; pointer-events: none; z-index: 9998; animation: rippleWave 0.65s ease-out forwards; } .card.spotlight-card { background-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.65) 0%, transparent 60%), linear-gradient(145deg, #ffffff 0%, #fefce8 65%, #fef3c7 100%) !important; } @keyframes holoShift { 0% { filter: hue-rotate(0deg) brightness(1.05); } 50% { filter: hue-rotate(45deg) brightness(1.15); } 100% { filter: hue-rotate(0deg) brightness(1.05); } } .card.holo-card { border: 2px solid #f59e0b !important; box-shadow: 0 0 18px rgba(251, 191, 36, 0.75), inset 0 0 12px rgba(253, 224, 71, 0.5) !important; animation: holoShift 3s infinite ease-in-out; } @keyframes shockwave10D { 0% { transform: translate(-50%, -50%) scale(0.1); opacity: 1; border-width: 6px; } 100% { transform: translate(-50%, -50%) scale(4.5); opacity: 0; border-width: 1px; } } .table-shockwave { position: absolute; top: 50%; left: 50%; width: 120px; height: 120px; border: 6px solid #fbbf24; border-radius: 50%; pointer-events: none; z-index: 50; animation: shockwave10D 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards; } @keyframes coinFall10D { 0% { transform: translateY(-20px) rotateY(0deg) scale(0.8); opacity: 1; } 100% { transform: translateY(340px) rotateY(720deg) scale(1.1); opacity: 0; } } .gold-coin-10d { position: absolute; font-size: 20px; pointer-events: none; z-index: 60; text-shadow: 0 0 10px #fbbf24; }';
+document.head.appendChild(style10D);
 setInterval(() => {
 const table = document.querySelector('.poker-table');
 const gameScr = document.getElementById('gameScreen');
@@ -746,5 +646,58 @@ if (e.target.closest('.card.clickable')) navigator.vibrate(25);
 else if (e.target.closest('button')) navigator.vibrate(15);
 }
 } catch (err) {}
+});
+function triggerTableShockwave(color) {
+const table = document.querySelector('.poker-table');
+if (!table) return;
+const wave = document.createElement('div');
+wave.className = 'table-shockwave';
+if (color) wave.style.borderColor = color;
+table.appendChild(wave);
+setTimeout(() => wave.remove(), 850);
+}
+function triggerGoldRain10D() {
+const table = document.querySelector('.poker-table');
+if (!table) return;
+const icons = ['👑', '✨', '🪙', '💎'];
+for (let i = 0; i < 24; i++) {
+const coin = document.createElement('div');
+coin.className = 'gold-coin-10d';
+coin.innerText = icons[Math.floor(Math.random() * icons.length)];
+coin.style.left = (Math.random() * 84 + 8) + '%';
+coin.style.top = '0px';
+const dur = Math.random() * 1000 + 1200;
+coin.style.animation = 'coinFall10D ' + dur + 'ms ease-in forwards';
+table.appendChild(coin);
+setTimeout(() => coin.remove(), dur);
+}
+}
+setInterval(() => {
+document.querySelectorAll('#playerCards .card:not(.hidden)').forEach(card => {
+const txt = card.innerText || '';
+if (txt.startsWith('A') || txt.startsWith('10')) {
+card.classList.add('holo-card');
+}
+});
+}, 500);
+let lastStatus10D = '';
+socket.on('gameState', (state) => {
+if (state.statusText && state.statusText !== lastStatus10D) {
+lastStatus10D = state.statusText;
+if (state.statusText.includes('PORĄ')) {
+triggerTableShockwave('#fbbf24');
+triggerGoldRain10D();
+try { if (navigator.vibrate) navigator.vibrate(); } catch (e) {}
+} else if (state.statusText.includes('Kirtį paėmė')) {
+const nums = state.statusText.match(/[0-9]+/g);
+const pts = nums ? Number(nums[nums.length - 1]) : 0;
+if (pts >= 20) {
+triggerTableShockwave('#10b981');
+try { if (navigator.vibrate) navigator.vibrate(50); } catch (e) {}
+} else {
+triggerTableShockwave('rgba(255,255,255,0.45)');
+}
+}
+}
 });
 // PABAIGA

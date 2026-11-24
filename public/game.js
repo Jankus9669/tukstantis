@@ -146,7 +146,7 @@ if (maleBtn && femaleBtn) {
 
 document.getElementById('createRoomBtn').addEventListener('click', () => {
     const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
-    socket.emit('createRoom', { playerName: name, avatar: selectedAvatar, playerId: myPlayerId });
+    socket.emit('createRoom', { playerName: name, avatar: selectedAvatar, playerToken: myPlayerId });
 });
 
 document.getElementById('joinRoomBtn').addEventListener('click', () => {
@@ -156,31 +156,21 @@ document.getElementById('joinRoomBtn').addEventListener('click', () => {
         alert('Įvesk kambario kodą!');
         return;
     }
-    socket.emit('joinRoom', { roomCode: code, playerName: name, avatar: selectedAvatar, playerId: myPlayerId });
-});
-
-socket.on('roomJoined', ({ roomCode }) => {
-    currentRoomCode = roomCode;
-    const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
-    saveSession(roomCode, name, selectedAvatar);
-
-    document.getElementById('lobbyScreen').style.display = 'none';
-    document.getElementById('gameScreen').style.display = 'flex';
-    document.getElementById('displayRoomCode').innerText = roomCode;
+    socket.emit('joinRoom', { roomCode: code, playerName: name, avatar: selectedAvatar, playerToken: myPlayerId });
 });
 
 socket.on('errorMsg', (msg) => {
     alert(msg);
-    if (msg.includes('neegzistuoja')) clearSession();
+    if (msg.includes('nerastas')) clearSession();
 });
 
 socket.on('connect', () => {
     const saved = localStorage.getItem('tukstantis_session');
     if (saved) {
         try {
-            const { roomCode, playerName, avatar } = JSON.parse(saved);
+            const { roomCode } = JSON.parse(saved);
             if (roomCode) {
-                socket.emit('joinRoom', { roomCode, playerName, avatar, playerId: myPlayerId });
+                socket.emit('rejoinRoom', { roomCode, playerToken: myPlayerId });
             }
         } catch (e) {}
     }
@@ -218,10 +208,11 @@ socket.on('chatMessage', ({ sender, avatar, text }) => {
 const sweepStyle = document.createElement('style');
 sweepStyle.innerHTML = '@keyframes sweepBannerPop { 0% { transform: translate(-50%, -50%) scale(0.3) rotate(-8deg); opacity: 0; } 20% { transform: translate(-50%, -50%) scale(1.12) rotate(2deg); opacity: 1; } 80% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.25); opacity: 0; } } .sweep-banner { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 45%, #fbbf24 100%); color: #fff; padding: 18px 28px; border-radius: 16px; border: 3px solid #fef08a; box-shadow: 0 0 40px rgba(251, 191, 36, 0.9), 0 15px 35px rgba(0, 0, 0, 0.85); z-index: 9999; text-align: center; pointer-events: none; animation: sweepBannerPop 3.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }';
 document.head.appendChild(sweepStyle);
+
 function triggerCleanSweepAnimation(winnerName) {
-const old = document.querySelector('.sweep-banner');
-if (old) old.remove();
-const banner = document.createElement('div');
+    const old = document.querySelector('.sweep-banner');
+    if (old) old.remove();
+    const banner = document.createElement('div');
 banner.className = 'sweep-banner';
 banner.innerHTML = '⚔️ SAUSAS SUTRIUŠKINIMAS! ⚔️' +
 '' + winnerName + ' sutriuškino priešininkus (7:0 kirčių)!';
@@ -232,6 +223,14 @@ playSound('win');
 }
 // --- PAGRINDINĖ BŪSENOS ATVAIZDAVIMO FUNKCIJA ---
 socket.on('gameState', (state) => {
+if (state.roomCode) {
+currentRoomCode = state.roomCode;
+const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
+saveSession(state.roomCode, name, selectedAvatar);
+document.getElementById('lobbyScreen').style.display = 'none';
+document.getElementById('gameScreen').style.display = 'flex';
+document.getElementById('displayRoomCode').innerText = state.roomCode;
+}
 const prevPhase = lastState ? lastState.phase : null;
 const prevTrickCount = lastState ? lastState.trickCards.length : 0;
 if (state.trickCards.length > prevTrickCount) playSound('card');

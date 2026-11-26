@@ -1035,5 +1035,110 @@ triggerTableShockwave('rgba(255,255,255,0.45)');
         if (meBox && me) meBox.classList.toggle('on-barrel', me.totalScore >= barrel);
     });
 })();
+// --- POMPASTIŠKAS ČEMPIONO ŠOU (GAME_OVER) ---
+(function initChampionShow() {
+    const style = document.createElement('style');
+    style.innerHTML = '@keyframes champPop { 0% { transform: scale(0.3) rotate(-6deg); opacity: 0; } 60% { transform: scale(1.06) rotate(1deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } } @keyframes trophyFloat { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10px) scale(1.12); } } @keyframes fireworkBurst { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; } } .champ-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, rgba(251,191,36,0.28) 0%, rgba(2,6,23,0.92) 85%); z-index: 10005; display: flex; align-items: center; justify-content: center; padding: 16px; } .champ-card { background: linear-gradient(145deg, #1e1b4b 0%, #0f172a 55%, #451a03 100%); border: 4px solid #fbbf24; border-radius: 24px; max-width: 440px; width: 100%; padding: 26px 22px; text-align: center; color: #fff; box-shadow: 0 0 60px rgba(251,191,36,0.85), inset 0 0 30px rgba(251,191,36,0.25); animation: champPop 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards; position: relative; z-index: 10007; } .champ-trophy { font-size: 74px; display: inline-block; filter: drop-shadow(0 0 22px #fbbf24); animation: trophyFloat 1.8s infinite ease-in-out; } .fw-spark { position: fixed; width: 8px; height: 8px; border-radius: 50%; pointer-events: none; z-index: 10006; animation: fireworkBurst 1.1s ease-out forwards; }';
+    document.head.appendChild(style);
+
+    function playChampionFanfare() {
+        if (localStorage.getItem('tuk_mute') === '1') return;
+        try {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            const ctx = new Ctx();
+            const notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50];
+            const times = [0, 0.14, 0.28, 0.44, 0.68, 0.84];
+            const durs = [0.13, 0.13, 0.15, 0.22, 0.14, 0.65];
+            notes.forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, ctx.currentTime + times[i]);
+                gain.gain.setValueAtTime(0.22, ctx.currentTime + times[i]);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + times[i] + durs[i]);
+                osc.start(ctx.currentTime + times[i]);
+                osc.stop(ctx.currentTime + times[i] + durs[i]);
+            });
+        } catch (e) {}
+    }
+
+    function launchFireworks() {
+        const colors = ['#fbbf24', '#ef4444', '#10b981', '#3b82f6', '#f472b6', '#ffffff'];
+        for (let b = 0; b < 7; b++) {
+            setTimeout(() => {
+                const cx = Math.random() * 80 + 10;
+                const cy = Math.random() * 55 + 15;
+                const col = colors[Math.floor(Math.random() * colors.length)];
+                for (let p = 0; p < 22; p++) {
+                    const spark = document.createElement('div');
+                    spark.className = 'fw-spark';
+                    spark.style.left = cx + 'vw';
+                    spark.style.top = cy + 'vh';
+                    spark.style.backgroundColor = col;
+                    spark.style.boxShadow = '0 0 10px ' + col;
+                    const angle = (Math.PI * 2 * p) / 22;
+                    const dist = Math.random() * 140 + 60;
+                    spark.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+                    spark.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+                    document.body.appendChild(spark);
+                    setTimeout(() => spark.remove(), 1150);
+                }
+            }, b * 420);
+        }
+    }
+
+    function showChampionModal(state) {
+        const old = document.querySelector('.champ-overlay');
+        if (old) old.remove();
+
+        const ranked = state.seats.slice().sort((a, b) => b.totalScore - a.totalScore);
+        const champ = ranked.at(0);
+        const goal = state.targetScore || 1000;
+
+        playChampionFanfare();
+        launchFireworks();
+        if (typeof triggerConfetti === 'function') triggerConfetti();
+        try { if (navigator.vibrate) navigator.vibrate([120, 60, 120, 60, 300]); } catch (e) {}
+
+        const overlay = document.createElement('div');
+        overlay.className = 'champ-overlay';
+
+        const podiumHtml = ranked.map((s, idx) => {
+            const medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : '🥉');
+            const rowBg = idx === 0 ? 'rgba(251,191,36,0.22)' : 'rgba(30,41,59,0.75)';
+            const rowBorder = idx === 0 ? '1px solid #fbbf24' : '1px solid rgba(255,255,255,0.1)';
+            return '<div style="display:flex; justify-content:space-between; align-items:center; background:' + rowBg + '; border:' + rowBorder + '; padding:10px 14px; border-radius:12px; margin-bottom:8px;">' +
+                '<div style="font-size:16px; font-weight:bold;">' + medal + ' ' + s.avatar + ' ' + s.name + '</div>' +
+                '<div style="font-size:16px; font-weight:900; color:#fde68a;">' + s.totalScore + ' / ' + goal + '</div>' +
+                '</div>';
+        }).join('');
+
+        overlay.innerHTML = '<div class="champ-card">' +
+            '<div class="champ-trophy">🏆</div>' +
+            '<div style="font-size:13px; letter-spacing:3px; color:#fde68a; font-weight:bold; margin-top:4px;">KLUBO ČEMPIONAS</div>' +
+            '<h2 style="margin:6px 0 4px 0; font-size:28px; color:#fbbf24; text-shadow:0 2px 10px rgba(0,0,0,0.8);">' + champ.avatar + ' ' + champ.name + '</h2>' +
+            '<div style="font-size:14px; color:#cbd5e1; margin-bottom:16px;">Surinko <strong>' + champ.totalScore + '</strong> taškų ir laimėjo partiją!</div>' +
+            '<div style="margin-bottom:18px;">' + podiumHtml + '</div>' +
+            '<button id="closeChampShowBtn" style="width:100%; padding:13px; font-size:16px; font-weight:900; background:linear-gradient(135deg, #f59e0b, #d97706); color:#111; border-radius:14px; border:2px solid #fef08a; cursor:pointer; box-shadow:0 6px 20px rgba(245,158,11,0.5);">🎉 Užbaigti šventę ir grįžti prie stalo</button>' +
+            '</div>';
+
+        document.body.appendChild(overlay);
+        overlay.querySelector('#closeChampShowBtn').addEventListener('click', () => {
+            overlay.remove();
+        });
+    }
+
+    let lastShowPhase = null;
+    socket.on('gameState', (state) => {
+        if (state.phase === 'GAME_OVER' && lastShowPhase !== 'GAME_OVER') {
+            showChampionModal(state);
+        }
+        lastShowPhase = state.phase;
+    });
+})();
 // PABAIGA
+
 

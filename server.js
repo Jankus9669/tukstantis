@@ -189,6 +189,7 @@ function broadcastState(roomCode) {
 
             io.to(seat.socketId).emit('gameState', {
                 roomCode: room.code,
+                targetScore: room.targetScore,
                 mySeatIndex: seatIdx,
                 myHand: seat.hand,
                 myCardsRevealed: seat.cardsRevealed,

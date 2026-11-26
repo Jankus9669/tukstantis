@@ -15,6 +15,7 @@ const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
 function playSound(type) {
+if (localStorage.getItem('tuk_mute') === '1') return;
     try {
         if (!audioCtx) audioCtx = new AudioCtx();
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -827,4 +828,107 @@ triggerTableShockwave('rgba(255,255,255,0.45)');
         if (meAv) meAv.style.background = savedBg;
     }, 800);
 })();
+// --- 1. GARSO MYGTUKAS, 2. TAISYKLIŲ ATMINTINĖ IR 3. PARTIJŲ ISTORIJA BEI ČEMPIONAI ---
+(function initClubExtras() {
+    const roomBanner = document.querySelector('.room-banner');
+    if (roomBanner) {
+        const barWrap = document.createElement('div');
+        barWrap.style.cssText = 'display:inline-flex; gap:8px; margin-left:12px; vertical-align:middle;';
+
+        // 1. Garso mygtukas
+        const soundBtn = document.createElement('button');
+        soundBtn.type = 'button';
+        let isMuted = (localStorage.getItem('tuk_mute') === '1');
+        soundBtn.innerText = isMuted ? '🔇 Tylu' : '🔊 Garsas';
+        soundBtn.style.cssText = 'padding:4px 10px; font-size:12px; border-radius:12px; background:#1e293b; color:#fde68a; border:1px solid #fbbf24;';
+        soundBtn.addEventListener('click', () => {
+            isMuted = !isMuted;
+            localStorage.setItem('tuk_mute', isMuted ? '1' : '0');
+            soundBtn.innerText = isMuted ? '🔇 Tylu' : '🔊 Garsas';
+        });
+
+        // 2. Taisyklių mygtukas
+        const rulesBtn = document.createElement('button');
+        rulesBtn.type = 'button';
+        rulesBtn.innerText = '📖 Taisyklės';
+        rulesBtn.style.cssText = 'padding:4px 10px; font-size:12px; border-radius:12px; background:#1e293b; color:#fde68a; border:1px solid #fbbf24;';
+        rulesBtn.addEventListener('click', () => {
+            modal.style.display = 'flex';
+        });
+
+        barWrap.appendChild(soundBtn);
+        barWrap.appendChild(rulesBtn);
+        roomBanner.appendChild(barWrap);
+    }
+
+    // Taisyklių langas (Modal)
+    const modal = document.createElement('div');
+    modal.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.82); z-index:10000; align-items:center; justify-content:center; padding:16px;';
+    modal.innerHTML = '<div style="background:#0f172a; border:2px solid #fbbf24; border-radius:18px; max-width:480px; width:100%; padding:20px; text-align:left; color:#f8fafc; box-shadow:0 20px 50px rgba(0,0,0,0.9);">' +
+        '<h3 style="margin:0 0 12px 0; color:#fbbf24; text-align:center;">📖 Greita „Tūkstančio“ atmintinė</h3>' +
+        '<ul style="padding-left:18px; line-height:1.6; font-size:14px; color:#e2e8f0; margin:0 0 16px 0;">' +
+        '<li><strong>Tikslas:</strong> Pirmam surinkti <strong>1000 taškų</strong>.</li>' +
+        '<li><strong>Poros (Q + K):</strong> ♣ 100 | ♠ 80 | ♥ 60 | ♦ 40 tšk. (skelbiamos einant pirmam kirtyje).</li>' +
+        '<li><strong>Aklas žaidimas [x2]:</strong> Statant neatvertus kortų, taškai (ir bauda) dvigubinami.</li>' +
+        '<li><strong>900 „Statinė“ 🛢️:</strong> Pasiekus 900 tšk., taškai nebekyla – būtina laimėti statymą ir pasiekti 1000.</li>' +
+        '<li><strong>Pagalbos (1 kartą per žaidimą):</strong> <em>Duoti pliusą</em> (kitiems po +60) arba <em>3 devynakių spėjimas</em> (+120 / -120).</li>' +
+        '</ul>' +
+        '<button id="closeQuickRules" style="width:100%; background:#10b981; color:white; padding:10px; border-radius:10px;">Supratau, grįžti prie stalo</button>' +
+        '</div>';
+    document.body.appendChild(modal);
+    modal.querySelector('#closeQuickRules').addEventListener('click', () => modal.style.display = 'none');
+
+    // 3. Partijų istorija ir čempionų lentelė šoninėje kolonoje
+    const sideCol = document.querySelector('.side-column');
+    if (sideCol) {
+        const statsPanel = document.createElement('div');
+        statsPanel.className = 'side-panel';
+        statsPanel.innerHTML = '<h4>🏆 Čempionai ir Istorija</h4>' +
+            '<div id="champBoard" style="font-size:12px; color:#fde68a; margin-bottom:8px; text-align:left;">Kol kas pergalių nėra</div>' +
+            '<div style="border-top:1px solid rgba(255,255,255,0.12); padding-top:6px; font-size:11px; color:#94a3b8; text-align:left;">Paskutinės partijos:</div>' +
+            '<div id="roundHistoryList" style="max-height:110px; overflow-y:auto; font-size:12px; text-align:left; margin-top:4px; display:flex; flex-direction:column; gap:4px;"></div>';
+        sideCol.appendChild(statsPanel);
+    }
+
+    function renderChampBoard() {
+        const board = document.getElementById('champBoard');
+        if (!board) return;
+        const champs = JSON.parse(localStorage.getItem('tuk_champs') || '{}');
+        const entries = Object.entries(champs).sort((a, b) => b - a);
+        if (entries.length === 0) {
+            board.innerText = 'Sužaisk žaidimą iki 1000 tšk., kad patektum į lentelę!';
+            return;
+        }
+        board.innerHTML = entries.slice(0, 5).map(([name, wins], idx) => {
+            const medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '🎖️'));
+            return '<div>' + medal + ' <strong>' + name + '</strong>: ' + wins + ' perg.</div>';
+        }).join('');
+    }
+    renderChampBoard();
+
+    let lastRecordedPhase = null;
+    socket.on('gameState', (state) => {
+        if (state.phase === 'ROUND_OVER' && lastRecordedPhase !== 'ROUND_OVER') {
+            const list = document.getElementById('roundHistoryList');
+            if (list) {
+                const row = document.createElement('div');
+                row.style.cssText = 'background:rgba(30,41,59,0.8); padding:4px 6px; border-radius:6px;';
+                const summary = state.seats.map(s => s.avatar + ' ' + s.name + ': ' + s.totalScore).join(' | ');
+                row.innerText = summary;
+                list.prepend(row);
+            }
+        }
+        if (state.phase === 'GAME_OVER' && lastRecordedPhase !== 'GAME_OVER') {
+            const winner = state.seats.reduce((best, cur) => cur.totalScore > best.totalScore ? cur : best, state.seats);
+            if (winner && winner.totalScore >= 1000) {
+                const champs = JSON.parse(localStorage.getItem('tuk_champs') || '{}');
+                champs[winner.name] = (champs[winner.name] || 0) + 1;
+                localStorage.setItem('tuk_champs', JSON.stringify(champs));
+                renderChampBoard();
+            }
+        }
+        lastRecordedPhase = state.phase;
+    });
+})();
 // PABAIGA
+

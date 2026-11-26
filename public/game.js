@@ -699,4 +699,132 @@ triggerTableShockwave('rgba(255,255,255,0.45)');
 }
 }
 });
+// --- AVATARO KŪRĖJAS IR KORTŲ VIRŠELIŲ PASIRINKIMAS ---
+(function initCustomStudio() {
+    const lobbyCard = document.getElementById('lobbyScreen');
+    const createBtn = document.getElementById('createRoomBtn');
+    if (!lobbyCard || !createBtn) return;
+
+    // Paslepiame senus 2 mygtukus (Vyras / Moteris), nes dabar turėsime visą studiją
+    const oldRow = document.querySelector('#lobbyScreen .avatar-row');
+    if (oldRow) oldRow.style.display = 'none';
+
+    const emojis = ['👨', '👩', '😎', '🤠', '🦊', '🦁', '👑', '🤖'];
+    const bgColors = [
+        { name: 'Auksinė', val: 'linear-gradient(135deg, #f59e0b, #b45309)' },
+        { name: 'Smaragdinė', val: 'linear-gradient(135deg, #10b981, #065f46)' },
+        { name: 'Rubino', val: 'linear-gradient(135deg, #ef4444, #991b1b)' },
+        { name: 'Mėlyna', val: 'linear-gradient(135deg, #3b82f6, #1e3a8a)' },
+        { name: 'Violetinė', val: 'linear-gradient(135deg, #a855f7, #581c87)' }
+    ];
+    const cardBacks = [
+        { id: 'blue', label: '🔵 Mėlyna', css: 'repeating-linear-gradient(45deg, #1e3a8a, #1e3a8a 8px, #312e81 8px, #312e81 16px)', border: '#f8fafc' },
+        { id: 'red', label: '🔴 Rubinas', css: 'repeating-linear-gradient(45deg, #991b1b, #991b1b 8px, #7f1d1d 8px, #7f1d1d 16px)', border: '#fbbf24' },
+        { id: 'green', label: '🟢 Smaragdas', css: 'repeating-linear-gradient(45deg, #065f46, #065f46 8px, #022c22 8px, #022c22 16px)', border: '#34d399' },
+        { id: 'vip', label: '⚫ VIP Auksas', css: 'repeating-linear-gradient(45deg, #111827, #111827 8px, #292524 8px, #292524 16px)', border: '#fbbf24' }
+    ];
+
+    let savedEmoji = localStorage.getItem('tuk_emoji') || '😎';
+    let savedBg = localStorage.getItem('tuk_bg') || bgColors[0].val;
+    let savedBack = localStorage.getItem('tuk_back') || 'blue';
+    selectedAvatar = savedEmoji;
+
+    const studio = document.createElement('div');
+    studio.style.cssText = 'background:rgba(30,41,59,0.75); border:1px solid rgba(251,191,36,0.4); border-radius:14px; padding:12px; margin-bottom:14px; text-align:center;';
+
+    // Avataro peržiūra
+    const preview = document.createElement('div');
+    preview.style.cssText = 'width:58px; height:58px; border-radius:50%; margin:0 auto 8px auto; display:flex; align-items:center; justify-content:center; font-size:32px; border:3px solid #fbbf24; box-shadow:0 4px 12px rgba(0,0,0,0.6); background:' + savedBg + ';';
+    preview.innerText = savedEmoji;
+    studio.appendChild(preview);
+
+    // Personažų pasirinkimas
+    const emojiTitle = document.createElement('div');
+    emojiTitle.style.cssText = 'font-size:12px; color:#cbd5e1; margin-bottom:6px;';
+    emojiTitle.innerText = '1. Pasirink personažą ir fono spalvą:';
+    studio.appendChild(emojiTitle);
+
+    const emojiWrap = document.createElement('div');
+    emojiWrap.style.cssText = 'display:flex; justify-content:center; gap:6px; flex-wrap:wrap; margin-bottom:8px;';
+    emojis.forEach(em => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.innerText = em;
+        b.style.cssText = 'padding:5px 8px; font-size:18px; background:#0f172a; border:2px solid ' + (em === savedEmoji ? '#fbbf24' : '#334155') + '; border-radius:8px; cursor:pointer;';
+        b.addEventListener('click', () => {
+            savedEmoji = em;
+            selectedAvatar = em;
+            localStorage.setItem('tuk_emoji', em);
+            preview.innerText = em;
+            emojiWrap.querySelectorAll('button').forEach(x => x.style.borderColor = '#334155');
+            b.style.borderColor = '#fbbf24';
+        });
+        emojiWrap.appendChild(b);
+    });
+    studio.appendChild(emojiWrap);
+
+    // Fono spalvos
+    const bgWrap = document.createElement('div');
+    bgWrap.style.cssText = 'display:flex; justify-content:center; gap:8px; margin-bottom:12px;';
+    bgColors.forEach(col => {
+        const dot = document.createElement('div');
+        dot.title = col.name;
+        dot.style.cssText = 'width:24px; height:24px; border-radius:50%; background:' + col.val + '; cursor:pointer; border:2px solid ' + (col.val === savedBg ? '#ffffff' : 'transparent') + '; box-shadow:0 2px 6px rgba(0,0,0,0.5);';
+        dot.addEventListener('click', () => {
+            savedBg = col.val;
+            localStorage.setItem('tuk_bg', col.val);
+            preview.style.background = col.val;
+            bgWrap.querySelectorAll('div').forEach(x => x.style.borderColor = 'transparent');
+            dot.style.borderColor = '#ffffff';
+        });
+        bgWrap.appendChild(dot);
+    });
+    studio.appendChild(bgWrap);
+
+    // Kortų viršelių pasirinkimas
+    const backTitle = document.createElement('div');
+    backTitle.style.cssText = 'font-size:12px; color:#cbd5e1; margin-bottom:6px;';
+    backTitle.innerText = '2. Pasirink kortų viršelį (nugarėlę):';
+    studio.appendChild(backTitle);
+
+    const backWrap = document.createElement('div');
+    backWrap.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:6px;';
+
+    function applyCardBackStyle(backId) {
+        const found = cardBacks.find(x => x.id === backId) || cardBacks[0];
+        let tag = document.getElementById('customCardBackStyle');
+        if (!tag) {
+            tag = document.createElement('style');
+            tag.id = 'customCardBackStyle';
+            document.head.appendChild(tag);
+        }
+        tag.innerHTML = '.card.hidden { background: ' + found.css + ' !important; border: 2px solid ' + found.border + ' !important; } #meAvatar { background: ' + savedBg + ' !important; }';
+    }
+
+    cardBacks.forEach(cb => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.innerText = cb.label;
+        btn.style.cssText = 'padding:6px 8px; font-size:12px; background:#0f172a; color:#f8fafc; border:2px solid ' + (cb.id === savedBack ? '#fbbf24' : '#334155') + '; border-radius:8px; cursor:pointer;';
+        btn.addEventListener('click', () => {
+            savedBack = cb.id;
+            localStorage.setItem('tuk_back', cb.id);
+            applyCardBackStyle(cb.id);
+            backWrap.querySelectorAll('button').forEach(x => x.style.borderColor = '#334155');
+            btn.style.borderColor = '#fbbf24';
+        });
+        backWrap.appendChild(btn);
+    });
+    studio.appendChild(backWrap);
+
+    // Įterpiame studiją prieš „Sukurti naują kambarį“ mygtuką
+    lobbyCard.insertBefore(studio, createBtn);
+    applyCardBackStyle(savedBack);
+
+    // Atnaujiname mano avataro foną ir prie stalo
+    setInterval(() => {
+        const meAv = document.getElementById('meAvatar');
+        if (meAv) meAv.style.background = savedBg;
+    }, 800);
+})();
 // PABAIGA

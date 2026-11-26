@@ -476,6 +476,104 @@ function finishRound(roomCode) {
     }
 }
 
+function chooseSmartBotCard(seat, validCards, trickCards, trumpSuit) {
+    const suitOrder = { '♣': 4, '♠': 3, '♥': 2, '♦': 1 };
+    const getPts = (c) => (c.points !== undefined ? c.points : ({ 'A': 11, '10': 10, 'K': 4, 'Q': 3, 'J': 2, '9': 0 }[c.name] || 0));
+
+    // Pagalbinė funkcija: patikrina, ar korta c1 nukerta c2
+    const beats = (c1, c2, leadSuit) => {
+        if (c1.suit === c2.suit) return c1.power > c2.power;
+        if (trumpSuit && c1.suit === trumpSuit && c2.suit !== trumpSuit) return true;
+        return false;
+    };
+
+    // 1. EINA PIRMAS (trickCards tuščias)
+    if (trickCards.length === 0) {
+        // Ieško visų turimų Q+K porų
+        const marriages = validCards.filter(c => (c.name === 'Q' || c.name === 'K') &&
+            seat.hand.some(p => p.suit === c.suit && p.name === (c.name === 'Q' ? 'K' : 'Q')));
+
+        if (marriages.length > 0) {
+            // Skelbia vertingiausią porą (jei jau yra koziris - kozirinei duoda prioritetą)
+            marriages.sort((a, b) => {
+                const aBonus = (a.suit === trumpSuit ? 200 : 0) + (suitOrder[a.suit] || 0) * 20;
+                const bBonus = (b.suit === trumpSuit ? 200 : 0) + (suitOrder[b.suit] || 0) * 20;
+                return bBonus - aBonus;
+            });
+            return marriages.at(0);
+        }
+
+        // Eina su garantuotu Tūzu (pirmenybė nekiziriniam Tūzui, po to koziriniam)
+        const nonTrumpAces = validCards.filter(c => c.name === 'A' && c.suit !== trumpSuit);
+        if (nonTrumpAces.length > 0) return nonTrumpAces.at(0);
+
+        const trumpAces = validCards.filter(c => c.name === 'A' && c.suit === trumpSuit);
+        if (trumpAces.length > 0) return trumpAces.at(0);
+
+        // Jei kitas botas ar pats laimėjo statymą ir turi daug kozirių – ištraukia priešininkų kozirius
+        if (trumpSuit) {
+            const trumps = validCards.filter(c => c.suit === trumpSuit).sort((a, b) => b.power - a.power);
+            if (trumps.length >= 3) return trumps.at(0);
+        }
+
+        // Priešingu atveju išmeta silpniausią „tuščią“ kortą (neliesdamas 10-akių ir porų)
+        const safeLeads = validCards.slice().sort((a, b) => {
+            const aDanger = getPts(a) * 10 + a.power + (a.suit === trumpSuit ? 50 : 0);
+            const bDanger = getPts(b) * 10 + b.power + (b.suit === trumpSuit ? 50 : 0);
+            return aDanger - bDanger;
+        });
+        return safeLeads.at(0);
+    }
+
+    // 2. EINA ANTRAS ARBA TREČIAS
+    const leadSuit = trickCards.at(0).card.suit;
+    let currentWinnerCard = trickCards.at(0).card;
+    let trickPoints = 0;
+
+    trickCards.forEach(item => {
+        trickPoints += getPts(item.card);
+        if (beats(item.card, currentWinnerCard, leadSuit)) {
+            currentWinnerCard = item.card;
+        }
+    });
+
+    // Atrenkame visas kortas, kuriomis botas gali laimėti šį kirtį
+    const winningCards = validCards.filter(c => beats(c, currentWinnerCard, leadSuit));
+
+    if (winningCards.length > 0) {
+        // Jei botas eina PASKUTINIS (3-ias) – ima pačia mažiausia laiminčia korta!
+        if (trickCards.length === 2) {
+            winningCards.sort((a, b) => (getPts(a) * 10 + a.power) - (getPts(b) * 10 + b.power));
+            return winningCards.at(0);
+        }
+
+        // Jei botas eina ANTRAS:
+        // Jei ant stalo jau yra vertingų taškų (>= 10) arba botas turi Tūzą tos pačios rūšies – kerta stipriai
+        const sameSuitWinners = winningCards.filter(c => c.suit === leadSuit).sort((a, b) => b.power - a.power);
+        if (sameSuitWinners.length > 0) {
+            if (sameSuitWinners.at(0).name === 'A' || trickPoints >= 10) {
+                return sameSuitWinners.at(0);
+            }
+        }
+
+        // Jei tenka pjauti koziriu, pjauna tik jei ant stalo yra bent 10 taškų (pvz., 10 arba A)
+        const trumpWinners = winningCards.filter(c => c.suit === trumpSuit).sort((a, b) => a.power - b.power);
+        if (trumpWinners.length > 0 && trickPoints >= 10) {
+            return trumpWinners.at(0);
+        }
+    }
+
+    // 3. NEGALI LAIMĖTI (arba neapsimoka pjauti) -> nusimeta pačią tuščiausią kortą!
+    const discardOrder = validCards.slice().sort((a, b) => {
+        const aIsPair = (a.name === 'Q' || a.name === 'K') && seat.hand.some(p => p.suit === a.suit && p.name === (a.name === 'Q' ? 'K' : 'Q'));
+        const bIsPair = (b.name === 'Q' || b.name === 'K') && seat.hand.some(p => p.suit === b.suit && p.name === (b.name === 'Q' ? 'K' : 'Q'));
+        const aVal = getPts(a) * 20 + a.power + (a.suit === trumpSuit ? 80 : 0) + (aIsPair ? 150 : 0);
+        const bVal = getPts(b) * 20 + b.power + (b.suit === trumpSuit ? 80 : 0) + (bIsPair ? 150 : 0);
+        return aVal - bVal;
+    });
+    return discardOrder.at(0);
+}
+
 function checkBotAction(roomCode) {
     const room = rooms[roomCode];
     if (!room || room.phase === 'NINE_GUESS') return;
@@ -484,6 +582,7 @@ function checkBotAction(roomCode) {
 
     setTimeout(() => {
         if (!rooms[roomCode] || room.phase === 'ROUND_OVER' || room.phase === 'GAME_OVER' || room.phase === 'NINE_GUESS') return;
+
         if (room.phase === 'BIDDING') {
             if (room.currentBid + 10 <= activeSeat.maxBid) {
                 room.currentBid += 10;
@@ -498,24 +597,17 @@ function checkBotAction(roomCode) {
             advanceBidding(roomCode);
         } else if (room.phase === 'PLAYING') {
             let validCards = activeSeat.hand.filter(c => isValidMove(activeSeat.hand, c, room.trickCards, room.trumpSuit));
-            let chosen = validCards.at(0);
-            if (room.trickCards.length === 0) {
-                let marriage = validCards.find(c => (c.name === 'Q' || c.name === 'K') && activeSeat.hand.some(p => p.suit === c.suit && p.name === (c.name === 'Q' ? 'K' : 'Q')));
-                if (marriage) chosen = marriage;
-                else {
-                    validCards.sort((a, b) => b.power - a.power);
-                    chosen = validCards.at(0);
-                }
-            } else {
-                validCards.sort((a, b) => a.power - b.power);
-                chosen = validCards.at(0);
-            }
+            if (validCards.length === 0) return;
+
+            const chosen = chooseSmartBotCard(activeSeat, validCards, room.trickCards, room.trumpSuit);
             let idx = activeSeat.hand.indexOf(chosen);
-            activeSeat.hand.splice(idx, 1);
-            executePlayCard(roomCode, room.currentTurnIndex, chosen);
+            if (idx === -1) idx = 0;
+            const playedCard = activeSeat.hand.splice(idx, 1).at(0);
+            executePlayCard(roomCode, room.currentTurnIndex, playedCard);
         }
-    }, 900);
+    }, 800);
 }
+
 
 function executePlayCard(roomCode, seatIdx, card) {
     const room = rooms[roomCode];

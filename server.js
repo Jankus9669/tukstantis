@@ -100,12 +100,13 @@ function getMarriageBonus(suit) {
     return 40;
 }
 
-function addBonusWithBarrelRule(seat, bonus) {
-    if (seat.totalScore >= 900) {
-        return seat.name + ' sėdi ant statinės (900). ';
-    } else if (seat.totalScore + bonus >= 900) {
-        seat.totalScore = 900;
-        return seat.name + ' pasiekė statinę (900)! ';
+function addBonusWithBarrelRule(seat, bonus, targetScore) {
+    const barrel = (targetScore || 1000) - 100;
+    if (seat.totalScore >= barrel) {
+        return seat.name + ' sėdi ant statinės (' + barrel + '). ';
+    } else if (seat.totalScore + bonus >= barrel) {
+        seat.totalScore = barrel;
+        return seat.name + ' pasiekė statinę (' + barrel + ')! ';
     } else {
         seat.totalScore += bonus;
         return seat.name + ' gauna +' + bonus + ' tšk.! ';
@@ -130,7 +131,7 @@ function createDeck() {
     return deck;
 }
 
-function evaluateBotHand(hand, totalScore) {
+function evaluateBotHand(hand, totalScore, targetScore) {
     let pts = hand.reduce((sum, c) => sum + c.value, 0);
     for (let s of suits) {
         if (hand.some(c => c.suit === s && c.name === 'K') && hand.some(c => c.suit === s && c.name === 'Q')) {
@@ -143,7 +144,7 @@ function evaluateBotHand(hand, totalScore) {
     else if (pts > 95) maxBid = 140;
     else if (pts > 75) maxBid = 120;
     else if (pts > 55) maxBid = 110;
-    if (totalScore >= 900 && maxBid < 110) maxBid = 110;
+    if (totalScore >= ((targetScore || 1000) - 100) && maxBid < 110) maxBid = 110;
     return maxBid;
 }
 
@@ -229,7 +230,7 @@ function startRound(roomCode) {
         seat.bidStatus = '-';
         seat.usedNineGuess = false;
         if (seat.isBot) {
-            seat.maxBid = evaluateBotHand(seat.hand, seat.totalScore);
+            seat.maxBid = evaluateBotHand(seat.hand, seat.totalScore, room.targetScore);
         }
     });
 
@@ -344,14 +345,14 @@ function evaluateNineGuess(roomCode) {
     let msg = '🔮 ' + giver.name + ' buvo paslėpęs 9' + targetSuit + ' (' + bonus + ' tšk.)! ';
 
     if (correctGuessers.length === 1) {
-        msg += 'Atspėjo tik ' + correctGuessers.at(0).name + '! ' + addBonusWithBarrelRule(correctGuessers.at(0), bonus);
+        msg += 'Atspėjo tik ' + correctGuessers.at(0).name + '! ' + addBonusWithBarrelRule(correctGuessers.at(0), bonus, room.targetScore)
     } else if (correctGuessers.length === 2) {
         const half = bonus / 2;
         msg += 'Atspėjo ABUDU (' + correctGuessers.at(0).name + ' ir ' + correctGuessers.at(1).name + '), todėl taškai dalinami per pusę (po +' + half + ' tšk.)! ';
-        msg += addBonusWithBarrelRule(correctGuessers.at(0), half);
-        msg += addBonusWithBarrelRule(correctGuessers.at(1), half);
+        msg += addBonusWithBarrelRule(correctGuessers.at(0), half, room.targetScore)
+        msg += addBonusWithBarrelRule(correctGuessers.at(1), half, room.targetScore)
     } else {
-        msg += 'Neatspėjo NĖ VIENAS! Visus taškus pasiima ' + giver.name + '! ' + addBonusWithBarrelRule(giver, bonus);
+        msg += 'Neatspėjo NĖ VIENAS! Visus taškus pasiima ' + giver.name + '! ' + addBonusWithBarrelRule(giver, bonus, room.targetScore)
     }
 
     room.phase = ng.prevPhase;
@@ -425,15 +426,16 @@ function finishRound(roomCode) {
         summary += '[Aklas žaidimas: kitų taškai x2!] ';
     }
 
+                const barrel = (room.targetScore || 1000) - 100;
     for (let idx = 0; idx < room.seats.length; idx++) {
         if (idx !== room.highestBidderIndex) {
             const s = room.seats[idx];
             let rounded = (Math.round(s.roundScore / 5) * 5) * mult;
-            if (s.totalScore >= 900) {
-                summary += s.name + ' ant statinės (900). ';
-            } else if (s.totalScore + rounded >= 900) {
-                s.totalScore = 900;
-                summary += s.name + ' pasiekė statinę (900)! ';
+            if (s.totalScore >= barrel) {
+                summary += s.name + ' ant statinės (' + barrel + '). ';
+            } else if (s.totalScore + rounded >= barrel) {
+                s.totalScore = barrel;
+                summary += s.name + ' pasiekė statinę (' + barrel + ')! ';
             } else {
                 s.totalScore += rounded;
             }
@@ -445,8 +447,10 @@ function finishRound(roomCode) {
     const sweepWinner = room.seats.find(s => s.tricksWon === 7);
     const sweepPrefix = sweepWinner ? ('⚔️ SAUSAS SUTRIUŠKINIMAS! ' + sweepWinner.name + ' sudorojo priešininkus nedavęs nė vieno kirčio! ') : '';
 
-    const loser = room.seats.find(s => s.totalScore <= -500);
-    const gameWinner = room.seats.find(s => s.totalScore >= 1000);
+        const goal = room.targetScore || 1000;
+    const loser = room.seats.find(s => s.totalScore <= -(goal / 2));
+    const gameWinner = room.seats.find(s => s.totalScore >= goal);
+
 
     if (loser) {
         room.phase = 'GAME_OVER';
@@ -542,7 +546,8 @@ function executePlayCard(roomCode, seatIdx, card) {
 }
 
 io.on('connection', (socket) => {
-    socket.on('createRoom', ({ playerName, avatar, playerToken }) => {
+        socket.on('createRoom', ({ playerName, avatar, playerToken, targetScore }) => {
+        const goal = (targetScore === 500) ? 500 : 1000;
         const code = generateRoomCode();
         rooms[code] = {
             code: code,
@@ -624,7 +629,7 @@ io.on('connection', (socket) => {
         room.seats.forEach(s => s.cardsRevealed = true);
 
         let infoMsg = '➕ ' + giver.name + ' pasinaudojo vienkartine pagalba „DUOTI PLIUSĄ“! Likusiems žaidėjams pridedama po +60 taškų. ';
-        room.seats.forEach((s, idx) => { if (idx !== seatIdx) infoMsg += addBonusWithBarrelRule(s, 60); });
+        room.seats.forEach((s, idx) => { if (idx !== seatIdx) infoMsg += addBonusWithBarrelRule(s, 60, room.targetScore); });
         room.roundStarterIndex = (room.roundStarterIndex + 1) % 3;
         room.statusText = infoMsg;
         broadcastState(roomCode);

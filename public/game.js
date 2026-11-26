@@ -930,5 +930,88 @@ triggerTableShockwave('rgba(255,255,255,0.45)');
         lastRecordedPhase = state.phase;
     });
 })();
+// --- GREITOJO REŽIMO (500 TŠK.) IR KLASIKINIO (1000 TŠK.) PASIRINKIMAS ---
+(function initGameModePicker() {
+    const lobbyCard = document.getElementById('lobbyScreen');
+    const createBtn = document.getElementById('createRoomBtn');
+    if (!lobbyCard || !createBtn) return;
+
+    const modeBox = document.createElement('div');
+    modeBox.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;';
+
+    const btn1000 = document.createElement('button');
+    btn1000.type = 'button';
+    btn1000.innerText = '🏆 Klasikinis (1000)';
+    btn1000.style.cssText = 'padding:8px; font-size:13px; background:#10b981; color:#fff; border:2px solid #fef08a; border-radius:10px; cursor:pointer;';
+
+    const btn500 = document.createElement('button');
+    btn500.type = 'button';
+    btn500.innerText = '⚡ Greitasis (500)';
+    btn500.style.cssText = 'padding:8px; font-size:13px; background:#1e293b; color:#cbd5e1; border:2px solid #334155; border-radius:10px; cursor:pointer;';
+
+    btn1000.addEventListener('click', () => {
+        selectedTargetScore = 1000;
+        btn1000.style.background = '#10b981';
+        btn1000.style.color = '#fff';
+        btn1000.style.borderColor = '#fef08a';
+        btn500.style.background = '#1e293b';
+        btn500.style.color = '#cbd5e1';
+        btn500.style.borderColor = '#334155';
+    });
+
+    btn500.addEventListener('click', () => {
+        selectedTargetScore = 500;
+        btn500.style.background = '#f59e0b';
+        btn500.style.color = '#111';
+        btn500.style.borderColor = '#fef08a';
+        btn1000.style.background = '#1e293b';
+        btn1000.style.color = '#cbd5e1';
+        btn1000.style.borderColor = '#334155';
+    });
+
+    modeBox.appendChild(btn1000);
+    modeBox.appendChild(btn500);
+    lobbyCard.insertBefore(modeBox, createBtn);
+
+    // Pritaikome taškų rodymą ir statinės ribą ant stalo pagal pasirinktą režimą
+    socket.on('gameState', (state) => {
+        const goal = state.targetScore || 1000;
+        const barrel = goal - 100;
+        const myIdx = state.mySeatIndex;
+        const leftIdx = (myIdx + 1) % 3;
+        const rightIdx = (myIdx + 2) % 3;
+
+        const me = state.seats[myIdx];
+        const left = state.seats[leftIdx];
+        const right = state.seats[rightIdx];
+
+        const meHeader = document.getElementById('meHeader');
+        if (meHeader && me) {
+            const blindTag = me.isBlind ? ' 🙈 [Aklai x2]' : '';
+            const barrelTag = me.totalScore >= barrel ? ' 🛢️' : '';
+            meHeader.innerText = me.name + blindTag + barrelTag + ' | Bendri: ' + me.totalScore + ' / ' + goal + ' | Partijoje: ' + me.roundScore;
+        }
+
+        const leftName = document.getElementById('leftName');
+        if (leftName && left) {
+            leftName.innerText = left.name + (left.totalScore >= barrel ? ' 🛢️' : '');
+            if (leftName.nextElementSibling) leftName.nextElementSibling.innerHTML = 'Bendri: <strong>' + left.totalScore + '</strong> / ' + goal;
+        }
+
+        const rightName = document.getElementById('rightName');
+        if (rightName && right) {
+            rightName.innerText = right.name + (right.totalScore >= barrel ? ' 🛢️' : '');
+            if (rightName.nextElementSibling) rightName.nextElementSibling.innerHTML = 'Bendri: <strong>' + right.totalScore + '</strong> / ' + goal;
+        }
+
+        const leftBox = document.getElementById('box-left');
+        const rightBox = document.getElementById('box-right');
+        const meBox = document.getElementById('box-me');
+        if (leftBox && left) leftBox.classList.toggle('on-barrel', left.totalScore >= barrel);
+        if (rightBox && right) rightBox.classList.toggle('on-barrel', right.totalScore >= barrel);
+        if (meBox && me) meBox.classList.toggle('on-barrel', me.totalScore >= barrel);
+    });
+})();
 // PABAIGA
+
 

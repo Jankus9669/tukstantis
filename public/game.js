@@ -937,8 +937,24 @@ triggerTableShockwave('rgba(255,255,255,0.45)');
 // --- GREITOJO REŽIMO (500 TŠK.) IR KLASIKINIO (1000 TŠK.) PASIRINKIMAS ---
 (function initGameModePicker() {
     const lobbyCard = document.getElementById('lobbyScreen');
-    const createBtn = document.getElementById('createRoomBtn');
-    if (!lobbyCard || !createBtn) return;
+    const oldCreateBtn = document.getElementById('createRoomBtn');
+    if (!lobbyCard || !oldCreateBtn) return;
+
+    // Pakeičiame mygtuką nauja kopija, kad garantuotai siųstų pasirinktą taškų ribą
+    const createBtn = oldCreateBtn.cloneNode(true);
+    oldCreateBtn.parentNode.replaceChild(createBtn, oldCreateBtn);
+
+    let chosenGoal = 1000;
+
+    createBtn.addEventListener('click', () => {
+        const name = document.getElementById('playerNameInput').value.trim() || 'Žaidėjas';
+        socket.emit('createRoom', {
+            playerName: name,
+            avatar: selectedAvatar,
+            playerToken: myPlayerId,
+            targetScore: chosenGoal
+        });
+    });
 
     const modeBox = document.createElement('div');
     modeBox.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;';
@@ -954,7 +970,7 @@ triggerTableShockwave('rgba(255,255,255,0.45)');
     btn500.style.cssText = 'padding:8px; font-size:13px; background:#1e293b; color:#cbd5e1; border:2px solid #334155; border-radius:10px; cursor:pointer;';
 
     btn1000.addEventListener('click', () => {
-        selectedTargetScore = 1000;
+        chosenGoal = 1000;
         btn1000.style.background = '#10b981';
         btn1000.style.color = '#fff';
         btn1000.style.borderColor = '#fef08a';
@@ -964,7 +980,7 @@ triggerTableShockwave('rgba(255,255,255,0.45)');
     });
 
     btn500.addEventListener('click', () => {
-        selectedTargetScore = 500;
+        chosenGoal = 500;
         btn500.style.background = '#f59e0b';
         btn500.style.color = '#111';
         btn500.style.borderColor = '#fef08a';
@@ -977,9 +993,9 @@ triggerTableShockwave('rgba(255,255,255,0.45)');
     modeBox.appendChild(btn500);
     lobbyCard.insertBefore(modeBox, createBtn);
 
-    // Pritaikome taškų rodymą ir statinės ribą ant stalo pagal pasirinktą režimą
+    // Pritaikome visus taškų rodymus ir stalo vandens ženklą pagal pasirinktą režimą
     socket.on('gameState', (state) => {
-        const goal = state.targetScore || 1000;
+        const goal = state.targetScore || chosenGoal || 1000;
         const barrel = goal - 100;
         const myIdx = state.mySeatIndex;
         const leftIdx = (myIdx + 1) % 3;
@@ -988,6 +1004,9 @@ triggerTableShockwave('rgba(255,255,255,0.45)');
         const me = state.seats[myIdx];
         const left = state.seats[leftIdx];
         const right = state.seats[rightIdx];
+
+        const watermark = document.querySelector('.table-watermark div');
+        if (watermark) watermark.innerText = goal;
 
         const meHeader = document.getElementById('meHeader');
         if (meHeader && me) {
@@ -1017,5 +1036,4 @@ triggerTableShockwave('rgba(255,255,255,0.45)');
     });
 })();
 // PABAIGA
-
 

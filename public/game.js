@@ -265,20 +265,24 @@ const rightIdx = (myIdx + 2) % 3;
 const me = state.seats[myIdx];
 const left = state.seats[leftIdx];
 const right = state.seats[rightIdx];
-// Kairys priešininkas
-document.getElementById('leftAvatar').innerText = left.avatar;
-document.getElementById('leftName').innerText = left.name + (left.totalScore >= 900 ? ' 🛢️' : '');
-document.getElementById('leftTotal').innerText = left.totalScore;
-document.getElementById('leftRound').innerText = left.roundScore;
-document.getElementById('leftCount').innerText = left.handCount;
-document.getElementById('leftBid').innerText = left.bidStatus;
-// Dešinys priešininkas
-document.getElementById('rightAvatar').innerText = right.avatar;
-document.getElementById('rightName').innerText = right.name + (right.totalScore >= 900 ? ' 🛢️' : '');
-document.getElementById('rightTotal').innerText = right.totalScore;
-document.getElementById('rightRound').innerText = right.roundScore;
-document.getElementById('rightCount').innerText = right.handCount;
-document.getElementById('rightBid').innerText = right.bidStatus;
+    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+    const goal = state.targetScore || 1000;
+    const barrel = goal - 100;
+    // Kairys priešininkas
+    setTxt('leftAvatar', left.avatar);
+    setTxt('leftName', left.name + (left.totalScore >= barrel ? ' 🛢️' : ''));
+    setTxt('leftTotal', left.totalScore);
+    setTxt('leftRound', left.roundScore);
+    setTxt('leftCount', left.cardCount !== undefined ? left.cardCount : left.handCount);
+    setTxt('leftBid', left.bidStatus);
+
+    // Dešinys priešininkas
+    setTxt('rightAvatar', right.avatar);
+    setTxt('rightName', right.name + (right.totalScore >= barrel ? ' 🛢️' : ''));
+    setTxt('rightTotal', right.totalScore);
+    setTxt('rightRound', right.roundScore);
+    setTxt('rightCount', right.cardCount !== undefined ? right.cardCount : right.handCount);
+    setTxt('rightBid', right.bidStatus);
 // Mano duomenys
 document.getElementById('meAvatar').innerText = me.avatar;
 const blindTag = me.isBlind ? ' 🙈 [Aklai x2]' : '';
